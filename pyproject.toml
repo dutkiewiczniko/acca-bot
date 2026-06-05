@@ -1,0 +1,9 @@
+[project]
+name = "acca-bot"
+version = "0.1.0"
+description = "Starter toolkit for soccer accumulator bet analysis."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+acca-bot = "accabot.cli:main"

@@ -3,13 +3,17 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import date, timedelta
+from pathlib import Path
 
 from .api_football import ApiFootballClient
+from .backfill import PREMIER_LEAGUE_ID, backfill_season
 from .config import load_settings
 from .dashboard import run_dashboard
 from .football_data import FootballDataClient
 from .odds_api import OddsApiClient
+from .ratelimit import RateLimiter
 from .scoring import build_accumulator, extract_selections
+from .storage import connect as connect_db
 
 
 def main() -> None:
@@ -43,6 +47,15 @@ def main() -> None:
     dashboard = subparsers.add_parser("dashboard", help="Run the local web dashboard.")
     dashboard.add_argument("--host", default="127.0.0.1", help="Dashboard host.")
     dashboard.add_argument("--port", type=int, default=8000, help="Dashboard port.")
+
+    backfill = subparsers.add_parser(
+        "backfill",
+        help="Backfill a season of fixtures/stats from API-Football into local SQLite storage, then score match importance.",
+    )
+    backfill.add_argument("--league", type=int, default=PREMIER_LEAGUE_ID, help="API-Football league id (default: Premier League, 39).")
+    backfill.add_argument("--season", type=int, required=True, help="Season start year, e.g. 2023 for the 2023/24 season.")
+    backfill.add_argument("--db", default="data/acca-bot.sqlite3", help="Path to the local SQLite database file.")
+    backfill.add_argument("--no-stats", action="store_true", help="Skip per-fixture statistics calls to save API request budget.")
 
     args = parser.parse_args()
     settings = load_settings()
@@ -140,6 +153,27 @@ def main() -> None:
 
     if args.command == "dashboard":
         run_dashboard(host=args.host, port=args.port)
+        return
+
+    if args.command == "backfill":
+        _require(settings.api_football_key, "API_FOOTBALL_KEY")
+        rate_limiter = RateLimiter(Path(".acca-bot-ratelimit.json"))
+        client = ApiFootballClient(settings.api_football_key, rate_limiter=rate_limiter)
+        conn = connect_db(Path(args.db))
+        report = backfill_season(client, conn, league_id=args.league, season=args.season, fetch_stats=not args.no_stats)
+        if report.error and not report.rate_limited:
+            raise SystemExit(f"API-Football returned an error: {report.error}")
+        print(f"Fixtures stored: {report.fixtures_stored}")
+        if not args.no_stats:
+            print(f"Fixture statistics fetched this run: {report.stats_fetched}")
+            print(f"Fixtures still missing statistics: {report.stats_remaining}")
+        print(f"Fixtures scored for importance: {report.importance_scored}")
+        print(f"Requests remaining today: {rate_limiter.remaining_today()}")
+        if report.daily_budget_hit:
+            print("Stopped early: today's API-Football request budget is exhausted. Re-run tomorrow (UTC) to continue.")
+        if report.rate_limited:
+            print("Stopped early: still being rate-limited after retrying. Wait a minute or two and re-run the same command.")
+        return
 
 
 def _require(value: str | None, name: str) -> None:

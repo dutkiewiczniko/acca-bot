@@ -11,6 +11,10 @@ class ApiError(RuntimeError):
     pass
 
 
+class RateLimitedError(ApiError):
+    """Raised when the server itself rejects a request for exceeding a rate limit (HTTP 429)."""
+
+
 def get_json(
     url: str,
     *,
@@ -29,7 +33,10 @@ def get_json(
             payload = response.read().decode("utf-8")
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise ApiError(f"HTTP {exc.code} from {url}: {detail}") from exc
+        message = f"HTTP {exc.code} from {url}: {detail}"
+        if exc.code == 429:
+            raise RateLimitedError(message) from exc
+        raise ApiError(message) from exc
     except URLError as exc:
         raise ApiError(f"Could not reach {url}: {exc.reason}") from exc
 

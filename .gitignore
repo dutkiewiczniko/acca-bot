@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+
+# local backfill state / data, not source
+.acca-bot-ratelimit.json
+data/
+
+# packaging
+*.egg-info/
+build/
+dist/

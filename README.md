@@ -90,6 +90,16 @@ Run the local dashboard:
 acca-bot dashboard
 ```
 
+Backfill a season of Premier League fixtures (and per-fixture statistics) from API-Football into local SQLite storage, then score every fixture for match importance:
+
+```powershell
+acca-bot backfill --season 2023
+```
+
+`--season 2023` means the 2023/24 season. `--league` defaults to `39` (Premier League; league ids are stable across seasons in API-Football). Pass `--no-stats` to only pull fixture results and skip the per-fixture statistics calls, which is the cheapest way to spend a limited request budget. The database file defaults to `data/acca-bot.sqlite3` (`--db` to change it).
+
+**API-Football's free plan is capped at 100 requests/day and 10/minute, with very limited historical season access.** The `backfill` command persists its daily request count to `.acca-bot-ratelimit.json` next to wherever you run it, so if a backfill run hits the daily cap partway through, it stops cleanly and picks up where it left off the next UTC day - just re-run the same command. A full season backfill with statistics costs roughly 1 (fixtures) + 1-per-finished-fixture (statistics) requests, so plan multi-day runs on the free tier, or upgrade once you've validated the pipeline.
+
 Then open `http://127.0.0.1:8000`. You can pass API keys through environment variables before starting the dashboard, or enter them into the dashboard inputs. The browser stores those inputs in local storage for your machine only.
 
 Useful football-data.org competition codes include `PL` for Premier League, `CL` for Champions League, and `WC` for World Cup.
@@ -124,23 +134,43 @@ That is intentionally naive. The next version should replace the placeholder wit
 
 ```text
 src/accabot/
-  cli.py              Command-line interface
-  dashboard.py        Local web dashboard server and frontend
-  api_football.py     API-Football client for injuries and lineups
-  espn.py             ESPN soccer scoreboard fallback client
-  config.py           Environment-based settings
-  football_data.py    football-data.org client
-  odds_api.py         The Odds API client
-  scoring.py          Selection extraction and accumulator ranking
-  models.py           Core dataclasses
+  cli.py               Command-line interface
+  dashboard.py         Local web dashboard server and frontend
+  api_football.py      API-Football client for fixtures, statistics, injuries, and lineups
+  espn.py              ESPN soccer scoreboard fallback client
+  config.py            Environment-based settings
+  football_data.py     football-data.org client
+  odds_api.py          The Odds API client
+  scoring.py           Selection extraction and accumulator ranking
+  models.py            Core dataclasses
+  storage.py           SQLite schema and upsert/fetch helpers for historical data
+  ratelimit.py         Persisted rate limiter for API-Football's per-minute/per-day caps
+  importance.py        Match importance scoring engine (title/Europe/relegation stakes, derbies)
+  backfill.py          Orchestrates client + storage + importance into one resumable season backfill
 tests/
   test_scoring.py
+  test_importance.py
+  test_storage.py
+  test_ratelimit.py
 ```
+
+## Match Importance
+
+Every backfilled fixture gets an `importance` score in `[0, 1]` in the `fixture_importance` table, computed entirely from locally stored results (no extra API calls) after a backfill. It reflects Premier-League-specific stakes, not the cup/group/final concept from knockout competitions:
+
+- **Title race** - how close a team sits to the league leader's points total.
+- **European qualification race** - how close a team sits to the auto-qualification cutoff line (rank 4/5 by default).
+- **Relegation battle** - how close a team sits to the drop-zone cutoff line.
+- Each component fades toward 0 once a team is mathematically too far away, given games remaining (`points gap > games_remaining * 3`).
+- A match's stakes score is the max of its two teams' averaged components across those three zones.
+- A **season weight** (0.4 early season, ramping to 1.0 by the run-in) scales stakes, since a mathematically-live title race in matchday 3 doesn't carry the same weight as one in matchday 36.
+- A small fixed bonus is added for known **derbies** (see `DERBY_PAIRS` in `importance.py` - a manually curated, extensible list).
+
+Standings snapshots are computed matchday-by-matchday using only results from strictly earlier matchdays, so importance reflects what was actually at stake going into a match, not hindsight from the final table. This is a first-pass heuristic, not ground truth - tune the boundary ranks, weighting curve, and derby list as the model matures.
 
 ## Next Build Steps
 
-1. Store normalized matches, teams, players, odds, and injuries in SQLite.
-2. Add team/player identity mapping between The Odds API, football-data.org, and API-Football.
-3. Add a real probability model and backtest it against historical results.
-4. Add bankroll controls, max correlation rules, and bookmaker/market filters.
-5. Build a small UI once the data model is stable.
+1. Add team/player identity mapping between The Odds API, football-data.org, and API-Football (needed to join live odds events to backfilled fixtures).
+2. Backfill several past Premier League seasons via `acca-bot backfill`, then add a real probability model trained/backtested against that historical data (including `fixture_importance` as a feature).
+3. Add bankroll controls, max correlation rules, and bookmaker/market filters.
+4. Build a small UI once the data model is stable.

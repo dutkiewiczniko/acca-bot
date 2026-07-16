@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -56,6 +57,18 @@ def main() -> None:
     backfill.add_argument("--season", type=int, required=True, help="Season start year, e.g. 2023 for the 2023/24 season.")
     backfill.add_argument("--db", default="data/acca-bot.sqlite3", help="Path to the local SQLite database file.")
     backfill.add_argument("--no-stats", action="store_true", help="Skip per-fixture statistics calls to save API request budget.")
+    backfill.add_argument(
+        "--per-minute",
+        type=int,
+        default=int(os.getenv("API_FOOTBALL_PER_MINUTE", "10")),
+        help="API-Football requests-per-minute cap (free plan: 10, Pro: 300).",
+    )
+    backfill.add_argument(
+        "--per-day",
+        type=int,
+        default=int(os.getenv("API_FOOTBALL_PER_DAY", "100")),
+        help="API-Football requests-per-day cap (free plan: 100, Pro: 7500).",
+    )
 
     args = parser.parse_args()
     settings = load_settings()
@@ -157,7 +170,7 @@ def main() -> None:
 
     if args.command == "backfill":
         _require(settings.api_football_key, "API_FOOTBALL_KEY")
-        rate_limiter = RateLimiter(Path(".acca-bot-ratelimit.json"))
+        rate_limiter = RateLimiter(Path(".acca-bot-ratelimit.json"), per_minute=args.per_minute, per_day=args.per_day)
         client = ApiFootballClient(settings.api_football_key, rate_limiter=rate_limiter)
         conn = connect_db(Path(args.db))
         report = backfill_season(client, conn, league_id=args.league, season=args.season, fetch_stats=not args.no_stats)

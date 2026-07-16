@@ -5,6 +5,9 @@ __pycache__/
 .acca-bot-ratelimit.json
 data/
 
+# secrets - never commit
+.env
+
 # packaging
 *.egg-info/
 build/

@@ -389,6 +389,19 @@ def fetch_teams_for_season(conn: sqlite3.Connection, *, league_id: int, season: 
     return [row[0] for row in cursor.fetchall()]
 
 
+def fetch_teams_with_season_stats(conn: sqlite3.Connection, *, league_id: int, season: int) -> set[int]:
+    """Team ids that already have a team_season_stats row for this league/season.
+
+    Used to resume a player/team-stats backfill: team_statistics is fetched
+    last in that pipeline, so its presence marks a team as fully done.
+    """
+    cursor = conn.execute(
+        "SELECT team_id FROM team_season_stats WHERE league_id = ? AND season = ?",
+        (league_id, season),
+    )
+    return {row[0] for row in cursor.fetchall()}
+
+
 def _parse_measurement(raw: Any) -> int | None:
     """Parse a height/weight field that may be '182', '182 cm', '79 kg', or empty/None."""
     if not raw:

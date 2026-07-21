@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from .api_football import ApiFootballClient
-from .backfill import PREMIER_LEAGUE_ID, backfill_season
+from .backfill import PREMIER_LEAGUE_ID, backfill_player_and_team_stats, backfill_season
 from .config import load_settings
 from .dashboard import run_dashboard
 from .football_data import FootballDataClient
@@ -57,6 +57,11 @@ def main() -> None:
     backfill.add_argument("--season", type=int, required=True, help="Season start year, e.g. 2023 for the 2023/24 season.")
     backfill.add_argument("--db", default="data/acca-bot.sqlite3", help="Path to the local SQLite database file.")
     backfill.add_argument("--no-stats", action="store_true", help="Skip per-fixture statistics calls to save API request budget.")
+    backfill.add_argument(
+        "--players",
+        action="store_true",
+        help="Also pull per-player season stats and per-team season aggregates (extra API requests, ~1-2 per team).",
+    )
     backfill.add_argument(
         "--per-minute",
         type=int,
@@ -181,6 +186,16 @@ def main() -> None:
             print(f"Fixture statistics fetched this run: {report.stats_fetched}")
             print(f"Fixtures still missing statistics: {report.stats_remaining}")
         print(f"Fixtures scored for importance: {report.importance_scored}")
+        if args.players:
+            player_report = backfill_player_and_team_stats(client, conn, league_id=args.league, season=args.season)
+            print(f"Player-season stat rows stored: {player_report.players_stored}")
+            print(f"Teams with season stats stored: {player_report.teams_stats_stored}")
+            if player_report.teams_pending:
+                print(f"Teams still pending player/team stats: {len(player_report.teams_pending)}")
+            if player_report.daily_budget_hit:
+                report.daily_budget_hit = True
+            if player_report.rate_limited:
+                report.rate_limited = True
         print(f"Requests remaining today: {rate_limiter.remaining_today()}")
         if report.daily_budget_hit:
             print("Stopped early: today's API-Football request budget is exhausted. Re-run tomorrow (UTC) to continue.")

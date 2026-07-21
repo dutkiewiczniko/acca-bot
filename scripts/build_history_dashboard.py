@@ -20,6 +20,8 @@ TEMPLATE_PATH = ROOT / "scripts" / "dashboard_template.html"
 OUTPUT_PATH = ROOT / "reports" / "pl_history_dashboard.html"
 TEAM_TEMPLATE_PATH = ROOT / "scripts" / "team_explorer_template.html"
 TEAM_OUTPUT_PATH = ROOT / "reports" / "pl_team_explorer.html"
+PLAYERS_TEMPLATE_PATH = ROOT / "scripts" / "players_template.html"
+PLAYERS_OUTPUT_PATH = ROOT / "reports" / "pl_players.html"
 
 LEAGUE_ID = 39  # Premier League in the api-football id space this DB uses
 
@@ -31,17 +33,31 @@ def main() -> None:
     team_data = build_team_explorer(con)
     con.close()
 
+    con2 = sqlite3.connect(DB_PATH)
+    con2.row_factory = sqlite3.Row
+    raw = build_home_raw(con2)
+    con2.close()
+
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    payload = json.dumps(data, separators=(",", ":"))
-    html = template.replace("__DASHBOARD_DATA__", payload)
+    html = template.replace("__HOME_RAW__", json.dumps(raw, separators=(",", ":")))
     OUTPUT_PATH.write_text(html, encoding="utf-8")
     print(f"Wrote {OUTPUT_PATH} ({len(html):,} bytes) from {DB_PATH}")
+    _ = data  # build_data remains the Python reference spec the in-page JS mirrors
 
     team_template = TEAM_TEMPLATE_PATH.read_text(encoding="utf-8")
     team_payload = json.dumps(team_data, separators=(",", ":"))
     team_html = team_template.replace("__TEAM_DATA__", team_payload)
     TEAM_OUTPUT_PATH.write_text(team_html, encoding="utf-8")
     print(f"Wrote {TEAM_OUTPUT_PATH} ({len(team_html):,} bytes) from {DB_PATH}")
+
+    con3 = sqlite3.connect(DB_PATH)
+    con3.row_factory = sqlite3.Row
+    players_raw = build_players(con3)
+    con3.close()
+    players_template = PLAYERS_TEMPLATE_PATH.read_text(encoding="utf-8")
+    players_html = players_template.replace("__PLAYERS_RAW__", json.dumps(players_raw, separators=(",", ":")))
+    PLAYERS_OUTPUT_PATH.write_text(players_html, encoding="utf-8")
+    print(f"Wrote {PLAYERS_OUTPUT_PATH} ({len(players_html):,} bytes) from {DB_PATH}")
 
 
 def build_data(con: sqlite3.Connection) -> dict:
@@ -834,6 +850,119 @@ def build_team_explorer(con: sqlite3.Connection) -> dict:
             "highlights": latest_highlights,
         },
         "coverage": coverage,
+    }
+
+
+def build_home_raw(con: sqlite3.Connection) -> dict:
+    """Compact raw match/stat data embedded in the home page so the period selector
+    can recompute every aggregate in the browser. Rows are arrays (not objects) to
+    keep the payload small; the field order is documented in the page's JS."""
+    teams = {row["id"]: row["name"] for row in con.execute("SELECT id, name FROM teams")}
+
+    fixtures = con.execute(
+        """
+        SELECT id, season, home_team_id, away_team_id, home_goals, away_goals, kickoff_utc
+        FROM fixtures WHERE league_id = ? ORDER BY kickoff_utc
+        """,
+        (LEAGUE_ID,),
+    ).fetchall()
+
+    stats = con.execute(
+        """
+        SELECT fs.fixture_id, fs.team_id, fs.shots_total, fs.shots_on_target,
+               fs.possession_pct, fs.corners, fs.fouls, fs.yellow_cards, fs.red_cards,
+               fs.passes_total, fs.passes_accurate, fs.expected_goals
+        FROM fixture_stats fs JOIN fixtures f ON f.id = fs.fixture_id
+        WHERE f.league_id = ?
+        """,
+        (LEAGUE_ID,),
+    ).fetchall()
+
+    importance = con.execute(
+        """
+        SELECT f.season, f.home_team_id, f.away_team_id, f.home_goals, f.away_goals,
+               f.kickoff_utc, fi.importance, fi.is_derby
+        FROM fixture_importance fi JOIN fixtures f ON f.id = fi.fixture_id
+        WHERE f.league_id = ?
+        """,
+        (LEAGUE_ID,),
+    ).fetchall()
+
+    seasons = sorted({f["season"] for f in fixtures})
+
+    return {
+        "generated_at": _now_iso(),
+        "league": "Premier League",
+        "seasons": seasons,
+        "teams": {str(k): v for k, v in teams.items()},
+        # [id, season, home_id, away_id, home_goals, away_goals, date]
+        "fixtures": [
+            [f["id"], f["season"], f["home_team_id"], f["away_team_id"],
+             f["home_goals"], f["away_goals"], (f["kickoff_utc"] or "")[:10]]
+            for f in fixtures
+        ],
+        # [fixture_id, team_id, shots, sot, poss, corners, fouls, yellow, red, passes, passes_acc, xg]
+        "stats": [
+            [s["fixture_id"], s["team_id"], s["shots_total"], s["shots_on_target"],
+             s["possession_pct"], s["corners"], s["fouls"], s["yellow_cards"],
+             s["red_cards"], s["passes_total"], s["passes_accurate"], s["expected_goals"]]
+            for s in stats
+        ],
+        # [season, home_id, away_id, home_goals, away_goals, date, importance, is_derby]
+        "importance": [
+            [i["season"], i["home_team_id"], i["away_team_id"], i["home_goals"],
+             i["away_goals"], (i["kickoff_utc"] or "")[:10], round(i["importance"], 4), i["is_derby"]]
+            for i in importance
+        ],
+    }
+
+
+def build_players(con: sqlite3.Connection) -> dict:
+    """Compact raw player-season data embedded in the Players page so leaderboards,
+    the impact index and per-player profiles can be computed in the browser with
+    period + club filters. Rows are arrays; field order documented in the page JS."""
+    teams = {row["id"]: row["name"] for row in con.execute("SELECT id, name FROM teams")}
+    players = {row["id"]: row for row in con.execute("SELECT id, name, nationality FROM players")}
+
+    pos_code = {"Attacker": "F", "Midfielder": "M", "Defender": "D", "Goalkeeper": "G"}
+
+    rows = con.execute(
+        """
+        SELECT player_id, team_id, season, position, appearances, minutes, rating,
+               goals, assists, shots_total, passes_key, tackles_total,
+               cards_yellow, cards_red
+        FROM player_season_stats
+        WHERE league_id = ? AND minutes IS NOT NULL AND minutes > 0
+        """,
+        (LEAGUE_ID,),
+    ).fetchall()
+
+    used_players: set[int] = set()
+    used_teams: set[int] = set()
+    pss = []
+    for r in rows:
+        used_players.add(r["player_id"])
+        used_teams.add(r["team_id"])
+        pss.append([
+            r["player_id"], r["team_id"], r["season"], pos_code.get(r["position"], "?"),
+            r["appearances"] or 0, r["minutes"] or 0,
+            round(r["rating"], 2) if r["rating"] is not None else None,
+            r["goals"] or 0, r["assists"] or 0, r["shots_total"] or 0,
+            r["passes_key"] or 0, r["tackles_total"] or 0,
+            r["cards_yellow"] or 0, r["cards_red"] or 0,
+        ])
+
+    seasons = sorted({r["season"] for r in rows})
+
+    return {
+        "generated_at": _now_iso(),
+        "league": "Premier League",
+        "seasons": seasons,
+        "teams": {str(k): teams[k] for k in used_teams if k in teams},
+        # id -> [name, nationality]
+        "players": {str(pid): [players[pid]["name"], players[pid]["nationality"]] for pid in used_players if pid in players},
+        # [player_id, team_id, season, pos, apps, minutes, rating, goals, assists, shots, key_passes, tackles, yellow, red]
+        "pss": pss,
     }
 
 

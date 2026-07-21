@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Premier League — Team Explorer</title>
+  <style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good-text:      #006300;
+
+    --series-1: #2a78d6; /* blue   */
+    --series-2: #008300; /* green  */
+    --series-3: #e87ba4; /* magenta*/
+    --series-4: #eda100; /* yellow */
+    --series-5: #1baf7a; /* aqua   */
+    --series-6: #eb6834; /* orange */
+    --series-7: #4a3aa7; /* violet */
+    --series-8: #e34948; /* red    */
+
+    --seq-100: #cde2fb; --seq-150: #b7d3f6; --seq-200: #9ec5f4; --seq-250: #86b6ef;
+    --seq-300: #6da7ec; --seq-350: #5598e7; --seq-400: #3987e5; --seq-450: #2a78d6;
+    --seq-500: #256abf; --seq-550: #1c5cab; --seq-600: #184f95; --seq-650: #104281;
+    --seq-700: #0d366b;
+
+    --div-pos: #2a78d6;  /* blue */
+    --div-neg: #e34948;  /* red */
+    --div-mid: #f0efec;
+
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --good-text:      #0ca30c;
+
+      --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+      --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+
+      --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --good-text:      #0ca30c;
+
+    --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+    --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+
+    --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body.viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 64px; }
+
+  header.hero {
+    padding: 40px 20px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-1);
+  }
+  header.hero .wrap { padding-bottom: 0; }
+  header.hero h1 { margin: 0 0 6px; font-size: clamp(24px, 4vw, 34px); font-weight: 750; }
+  header.hero p.sub { margin: 0; color: var(--text-secondary); font-size: 15px; max-width: 70ch; }
+  header.hero p.note { margin: 10px 0 0; color: var(--text-muted); font-size: 13px; max-width: 70ch; }
+
+  .period-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+    margin-top: 22px; padding: 12px 14px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .period-controls { display: flex; flex-wrap: wrap; gap: 12px; }
+  .period-controls label { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+  .period-controls select {
+    min-height: 34px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--page); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 650;
+  }
+  .period-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .period-presets button {
+    min-height: 30px; padding: 0 11px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--page); color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+  }
+  .period-presets button:hover { color: var(--text-primary); }
+  .period-presets button.active { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+  .period-summary { color: var(--text-muted); font-size: 12px; margin-left: auto; }
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0,1fr));
+    gap: 12px;
+    margin-top: 18px;
+  }
+  .kpi {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 14px 12px;
+    min-width: 0;
+  }
+  .kpi .label { color: var(--text-secondary); font-size: 12px; margin: 0 0 6px; }
+  .kpi .value { font-size: 24px; font-weight: 700; margin: 0; }
+  .kpi .value small { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+
+  nav.tabs {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; gap: 2px; overflow-x: auto;
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+  }
+  nav.tabs a {
+    display: inline-block; padding: 12px 14px; font-size: 13px; font-weight: 650;
+    color: var(--text-secondary); text-decoration: none; white-space: nowrap;
+    border-bottom: 2px solid transparent;
+  }
+  nav.tabs a:hover { color: var(--text-primary); border-bottom-color: var(--baseline); }
+
+  section.block { padding: 40px 0 8px; border-bottom: 1px solid var(--border); }
+  section.block:last-of-type { border-bottom: none; }
+  section.block h2 { font-size: 20px; margin: 0 0 4px; scroll-margin-top: 56px; }
+  section.block p.desc { color: var(--text-secondary); margin: 0 0 20px; max-width: 78ch; font-size: 13.5px; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 18px; min-width: 0;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  .card h3 { font-size: 14px; margin: 0 0 2px; }
+  .card p.hint { margin: 0 0 14px; color: var(--text-muted); font-size: 12px; }
+
+  .spot-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+  .spot {
+    background: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--series-1);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .spot h3 { margin: 0 0 6px; font-size: 14px; }
+  .spot p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+
+  /* bar chart (HTML/CSS based) */
+  .barlist { display: flex; flex-direction: column; gap: 6px; }
+  .barlist .row { display: grid; grid-template-columns: 128px 1fr 56px; align-items: center; gap: 8px; }
+  .barlist .row .name { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barlist .row .track { position: relative; height: 16px; background: var(--grid); border-radius: 4px; overflow: hidden; }
+  .barlist .row .fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .barlist .row .fill.alt { background: var(--series-5); }
+  .barlist .row .val { font-size: 12.5px; color: var(--text-primary); font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+  .barlist .row.highlight .name, .barlist .row.highlight .val { color: var(--text-primary); font-weight: 750; }
+
+  /* diverging bar */
+  .divlist .row { display: grid; grid-template-columns: 128px 1fr 64px; align-items: center; gap: 8px; }
+  .divlist .row .name { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .divlist .row .track { position: relative; height: 16px; background: var(--div-mid); border-radius: 4px; overflow: hidden; }
+  .divlist .row .track::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--baseline); }
+  .divlist .row .fill { position: absolute; top: 0; height: 100%; }
+  .divlist .row .fill.pos { left: 50%; background: var(--div-pos); border-radius: 0 4px 4px 0; }
+  .divlist .row .fill.neg { right: 50%; background: var(--div-neg); border-radius: 4px 0 0 4px; }
+  .divlist .row .val { font-size: 12.5px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+
+  svg.chart { width: 100%; height: auto; overflow: visible; display: block; }
+  svg.chart .grid-line { stroke: var(--grid); stroke-width: 1; }
+  svg.chart .baseline { stroke: var(--baseline); stroke-width: 1; }
+  svg.chart .axis-text { fill: var(--text-muted); font-size: 10.5px; }
+  svg.chart .mark-dot { stroke: var(--surface-1); stroke-width: 2; }
+  svg.chart .direct-label { fill: var(--text-secondary); font-size: 11px; font-weight: 650; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 4px; }
+  .legend .key { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100;
+    background: var(--text-primary); color: var(--surface-1);
+    font-size: 12px; line-height: 1.4; padding: 7px 10px; border-radius: 6px;
+    max-width: 240px; opacity: 0; transform: translate(-50%, -100%); transition: opacity .08s;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip b { font-weight: 700; }
+
+  details.table-toggle { margin-top: 14px; }
+  details.table-toggle summary {
+    cursor: pointer; font-size: 12px; color: var(--text-secondary); font-weight: 650;
+    list-style: none;
+  }
+  details.table-toggle summary::-webkit-details-marker { display: none; }
+  details.table-toggle summary::before { content: "\25B8  "; }
+  details.table-toggle[open] summary::before { content: "\25BE  "; }
+
+  table.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  table.data-table th, table.data-table td {
+    padding: 7px 9px; text-align: left; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.data-table th {
+    color: var(--text-muted); font-weight: 650; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .02em; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface-1);
+  }
+  table.data-table th.sort-asc::after { content: " \2191"; }
+  table.data-table th.sort-desc::after { content: " \2193"; }
+  table.data-table td.num, table.data-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data-table tbody tr:hover { background: rgba(128,128,128,.08); }
+
+  .table-scroll { max-height: 560px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .table-scroll table.data-table { margin-top: 0; }
+
+  input.search {
+    width: 100%; max-width: 320px; padding: 8px 10px; margin-bottom: 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); color: var(--text-primary);
+    font: inherit; font-size: 13px;
+  }
+
+  footer.site {
+    padding: 26px 20px 40px; text-align: center; color: var(--text-muted); font-size: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .card-grid { grid-template-columns: 1fr; }
+    .spot-grid { grid-template-columns: 1fr; }
+    .barlist .row, .divlist .row { grid-template-columns: 92px 1fr 50px; }
+    .period-summary { margin-left: 0; width: 100%; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 14px 48px; }
+    header.hero { padding: 24px 14px 20px; }
+    .kpi-row { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    .kpi { padding: 11px 11px 9px; }
+    .kpi .value { font-size: 20px; }
+    .period-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .period-controls { flex-direction: column; }
+    .period-controls label { justify-content: space-between; }
+    .period-controls select, .controls-row select.team-select { width: 100%; }
+    .period-presets { justify-content: flex-start; }
+    section.block { padding: 28px 0 8px; }
+    section.block h2 { font-size: 18px; }
+    .card { padding: 13px 13px 15px; }
+    .barlist .row, .divlist .row { grid-template-columns: 84px 1fr 46px; gap: 6px; }
+    .barlist .row .name { font-size: 12px; }
+    nav.tabs a { padding: 11px 10px; }
+  }
+
+  /* Team Explorer additions */
+  .controls-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 18px; }
+  .controls-row label { display: grid; gap: 5px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+  select.team-select {
+    min-width: 240px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 14px; font-weight: 650;
+  }
+  .backlink { color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 650; }
+  .backlink:hover { color: var(--text-primary); }
+  .pos-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 6px;
+    border-radius: 6px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pos-champ { background: color-mix(in srgb, var(--series-4) 26%, transparent); color: var(--text-primary); }
+  .pos-eur   { background: color-mix(in srgb, var(--series-1) 20%, transparent); color: var(--text-primary); }
+  .pos-rel   { background: color-mix(in srgb, var(--series-8) 22%, transparent); color: var(--text-primary); }
+  .coverage-note { font-size: 12.5px; color: var(--text-secondary); background: var(--surface-1);
+    border: 1px solid var(--border); border-left: 3px solid var(--series-4); border-radius: 8px; padding: 12px 14px; margin-top: 14px; }
+  .delta-up { color: var(--good-text); font-weight: 650; }
+  .delta-down { color: var(--div-neg); font-weight: 650; }
+</style>
+</head>
+<body class="viz-root">
+
+  <header class="hero">
+    <div class="wrap">
+      <a class="backlink" href="pl_history_dashboard.html">&larr; Full history dashboard</a>
+      <h1>Team Explorer</h1>
+      <p class="sub" id="hero-sub">Loading&hellip;</p>
+      <p class="note">The latest completed season at a glance, plus how any single club has performed across every season in the dataset. All figures are team/match level &mdash; there is no individual-player data, so this page tracks clubs, not squads. See the data-coverage section for how current the underlying sample is.</p>
+      <div class="kpi-row" id="kpi-row"></div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <a href="pl_history_dashboard.html">&larr; History dashboard</a>
+    <a href="#latest">Latest season</a>
+    <a href="#team-time">Team over time</a>
+    <a href="#coverage">Data coverage</a>
+    <a href="pl_players.html" style="margin-left:auto;font-weight:750;color:var(--series-1)">Players &rarr;</a>
+  </nav>
+
+  <div class="wrap">
+    <section class="block" id="latest">
+      <h2 id="latest-title">Latest season</h2>
+      <p class="desc">The most recent completed Premier League season in the dataset &mdash; final table computed directly from match results, with expected goals where available.</p>
+      <div class="spot-grid" id="latest-highlights"></div>
+      <div class="card wide" style="margin-top:18px">
+        <h3>Final table</h3>
+        <p class="hint">Ranked by points, then goal difference, then goals for. xG columns cover seasons from 2022/23. &ldquo;&Delta; pts&rdquo; is the change vs the previous season.</p>
+        <div class="table-scroll"><table class="data-table" id="latest-table"></table></div>
+      </div>
+    </section>
+
+    <section class="block" id="team-time">
+      <h2>Team over time</h2>
+      <p class="desc">Pick a club to see how its league finish, points and goals have moved season to season. Detailed stats begin in 2014/15 and expected goals in 2022/23, so earlier seasons show results only.</p>
+      <div class="controls-row">
+        <label>Club
+          <select class="team-select" id="team-select"></select>
+        </label>
+      </div>
+      <div class="card-grid">
+        <div class="card"><h3>League finish</h3><p class="hint">Final position each season (1 = top). Champions, European places and the drop shaded on the table below.</p><div id="chart-position"></div></div>
+        <div class="card"><h3>Points</h3><p class="hint">Final points total each season</p><div id="chart-points"></div></div>
+        <div class="card"><h3>Goals for &amp; against</h3><p class="hint">Scored vs conceded each season</p><div id="chart-goals"></div></div>
+        <div class="card"><h3>Expected goals for &amp; against</h3><p class="hint">Season xG created vs allowed (from 2022/23)</p><div id="chart-xg"></div></div>
+      </div>
+      <div class="card wide" style="margin-top:18px">
+        <h3 id="team-table-title">Season by season</h3>
+        <div class="table-scroll"><table class="data-table" id="team-table"></table></div>
+        <div class="coverage-note" id="team-coverage"></div>
+      </div>
+    </section>
+
+    <section class="block" id="coverage">
+      <h2>Data coverage &amp; freshness</h2>
+      <p class="desc">How current is the data behind each club's stats? This measures the <em>match sample</em> &mdash; how many matches have detailed stats and how recent they are &mdash; not squad turnover. Measuring how much of a club's current squad is reflected in a stat would need player-level lineup data, which this dataset does not contain. Until that is gathered, treat a club with few recent matches (or none in the latest season) as having a staler statistical profile.</p>
+      <div class="card wide">
+        <div class="table-scroll"><table class="data-table" id="coverage-table"></table></div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="site" id="footer"></footer>
+  <div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = __TEAM_DATA__;
+</script>
+<script>
+(function () {
+  "use strict";
+  const tooltip = document.getElementById("tooltip");
+  function showTooltip(evt, html) { tooltip.innerHTML = html; tooltip.classList.add("show"); moveTooltip(evt); }
+  function moveTooltip(evt) { tooltip.style.left = evt.clientX + "px"; tooltip.style.top = (evt.clientY - 10) + "px"; }
+  function hideTooltip() { tooltip.classList.remove("show"); }
+
+  function fmt(n, digits) {
+    if (n === null || n === undefined || Number.isNaN(n)) return "-";
+    return Number(n).toLocaleString(undefined, { minimumFractionDigits: digits || 0, maximumFractionDigits: digits || 0 });
+  }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+  function svgEl(tag, attrs) { const el = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const k in attrs) el.setAttribute(k, attrs[k]); return el; }
+
+  // line chart, multi-series, optional inverted y (for league position)
+  function lineChart(container, categories, series, opts) {
+    opts = opts || {};
+    const W = 640, H = 240, padL = 40, padR = 18, padT = 16, padB = 30;
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    const allVals = series.flatMap(s => s.values.filter(v => v !== null && v !== undefined));
+    if (!allVals.length) { container.innerHTML = '<p class="hint">No data for this club in these seasons.</p>'; return; }
+    let minV = opts.min !== undefined ? opts.min : Math.min(...allVals);
+    let maxV = opts.max !== undefined ? opts.max : Math.max(...allVals);
+    if (opts.min === undefined && opts.max === undefined) {
+      const pad = (maxV - minV) * 0.12 || 1; minV = Math.min(0, minV); maxV += pad;
+    }
+    if (maxV === minV) maxV = minV + 1;
+    const n = categories.length;
+    const x = i => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+    const y = v => opts.invert
+      ? padT + ((v - minV) / (maxV - minV)) * innerH
+      : padT + innerH - ((v - minV) / (maxV - minV)) * innerH;
+
+    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}` });
+    const ticks = opts.ticks || 4;
+    for (let t = 0; t <= ticks; t++) {
+      const v = minV + ((maxV - minV) * t) / ticks;
+      const yy = y(v);
+      svg.appendChild(svgEl("line", { class: "grid-line", x1: padL, x2: W - padR, y1: yy, y2: yy }));
+      const txt = svgEl("text", { class: "axis-text", x: padL - 6, y: yy + 3, "text-anchor": "end" });
+      txt.textContent = opts.yFmt ? opts.yFmt(v) : fmt(v, 1);
+      svg.appendChild(txt);
+    }
+    const step = Math.max(1, Math.round(n / 8));
+    categories.forEach((c, i) => {
+      if (i % step !== 0 && i !== n - 1) return;
+      const txt = svgEl("text", { class: "axis-text", x: x(i), y: H - 6, "text-anchor": "middle" });
+      txt.textContent = c;
+      svg.appendChild(txt);
+    });
+
+    series.forEach((s) => {
+      const pts = s.values.map((v, i) => [x(i), (v === null || v === undefined) ? null : y(v), v, i]).filter(p => p[1] !== null);
+      const d = pts.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+      svg.appendChild(svgEl("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      pts.forEach(([px, py, v, i]) => {
+        const dot = svgEl("circle", { class: "mark-dot", cx: px, cy: py, r: 4, fill: s.color });
+        dot.addEventListener("mousemove", (e) => showTooltip(e, `<b>${esc(categories[i])}</b><br>${esc(s.name)}: ${esc(opts.tipFmt ? opts.tipFmt(v) : fmt(v, 1))}`));
+        dot.addEventListener("mouseleave", hideTooltip);
+        svg.appendChild(dot);
+      });
+    });
+
+    container.innerHTML = "";
+    if (series.length > 1) {
+      const legend = document.createElement("div");
+      legend.className = "legend";
+      legend.innerHTML = series.map(s => `<span class="key"><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}</span>`).join("");
+      container.appendChild(legend);
+    }
+    container.appendChild(svg);
+  }
+
+  function renderTable(tableEl, columns, rows, opts) {
+    opts = opts || {};
+    let sortKey = opts.defaultSort || columns[0].key;
+    let sortDir = opts.defaultDir || "desc";
+    function draw() {
+      const sorted = [...rows].sort((a, b) => {
+        const av = a[sortKey], bv = b[sortKey];
+        let cmp;
+        if (typeof av === "string") cmp = av.localeCompare(bv);
+        else cmp = (av == null ? -Infinity : av) - (bv == null ? -Infinity : bv);
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+      const thead = `<thead><tr>${columns.map(c => `<th data-key="${c.key}" class="${c.num ? "num" : ""} ${sortKey === c.key ? (sortDir === "asc" ? "sort-asc" : "sort-desc") : ""}">${esc(c.label)}</th>`).join("")}</tr></thead>`;
+      const tbody = `<tbody>${sorted.map(r => `<tr>${columns.map(c => `<td class="${c.num ? "num" : ""}">${c.fmt ? c.fmt(r[c.key], r) : esc(r[c.key])}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      tableEl.innerHTML = thead + tbody;
+      tableEl.querySelectorAll("th").forEach((th) => th.addEventListener("click", () => {
+        const key = th.getAttribute("data-key");
+        if (sortKey === key) sortDir = sortDir === "asc" ? "desc" : "asc";
+        else { sortKey = key; sortDir = key === "position" || key === "season" ? "asc" : "desc"; }
+        draw();
+      }));
+    }
+    draw();
+  }
+
+  function posClass(pos, size) {
+    if (pos === 1) return "pos-champ";
+    if (pos <= 5) return "pos-eur";
+    if (pos >= (size || 20) - 2) return "pos-rel";
+    return "";
+  }
+  function posBadge(pos, size) { return `<span class="pos-badge ${posClass(pos, size)}">${pos}</span>`; }
+
+  // ---------------- init ----------------
+  const meta = DATA.meta;
+  document.getElementById("hero-sub").textContent =
+    `${meta.league} • ${meta.first_season}–${meta.latest_season} • latest completed season: ${meta.latest_season}`;
+  document.getElementById("latest-title").textContent = `Latest season — ${DATA.latest.season}`;
+
+  const champ = DATA.latest.table[0] || {};
+  const kpis = [
+    { label: "Latest season", value: DATA.latest.season },
+    { label: "Champions", value: champ.team || "-" },
+    { label: "Champions' points", value: champ.points != null ? champ.points : "-" },
+    { label: "Clubs tracked", value: DATA.team_list.length },
+    { label: "Seasons", value: meta.seasons.length },
+    { label: "Detailed stats from", value: meta.stat_seasons_from },
+  ];
+  document.getElementById("kpi-row").innerHTML = kpis.map(k => `<div class="kpi"><p class="label">${esc(k.label)}</p><p class="value">${esc(k.value)}</p></div>`).join("");
+
+  document.getElementById("latest-highlights").innerHTML = DATA.latest.highlights.map(h =>
+    `<div class="spot"><h3>${esc(h.team)}</h3><p><b>${esc(h.label)}</b> — ${esc(h.detail)}</p></div>`).join("");
+
+  const size = DATA.latest.table.length;
+  renderTable(document.getElementById("latest-table"), [
+    { key: "position", label: "#", num: true, fmt: v => posBadge(v, size) },
+    { key: "team", label: "Team" },
+    { key: "played", label: "P", num: true },
+    { key: "won", label: "W", num: true },
+    { key: "drawn", label: "D", num: true },
+    { key: "lost", label: "L", num: true },
+    { key: "gf", label: "GF", num: true },
+    { key: "ga", label: "GA", num: true },
+    { key: "gd", label: "GD", num: true, fmt: v => (v > 0 ? "+" : "") + v },
+    { key: "points", label: "Pts", num: true },
+    { key: "xg_for", label: "xG", num: true, fmt: v => v == null ? "-" : fmt(v, 1) },
+    { key: "xg_against", label: "xGA", num: true, fmt: v => v == null ? "-" : fmt(v, 1) },
+    { key: "points_delta", label: "Δ pts", num: true, fmt: v => v == null ? "-" : `<span class="${v > 0 ? 'delta-up' : v < 0 ? 'delta-down' : ''}">${v > 0 ? "+" : ""}${v}</span>` },
+  ], DATA.latest.table, { defaultSort: "position", defaultDir: "asc" });
+
+  // team over time
+  const select = document.getElementById("team-select");
+  select.innerHTML = DATA.team_list.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  const defaultTeam = champ.team && DATA.team_seasons[champ.team] ? champ.team : DATA.team_list[0];
+  select.value = defaultTeam;
+  select.addEventListener("change", () => renderTeam(select.value));
+
+  function renderTeam(name) {
+    const records = DATA.team_seasons[name] || [];
+    const cats = records.map(r => r.season);
+    const tableSize = records.length ? (records[records.length - 1].table_size || 20) : 20;
+
+    lineChart(document.getElementById("chart-position"), cats,
+      [{ name: "Finish", color: "var(--series-1)", values: records.map(r => r.position) }],
+      { invert: true, min: 1, max: tableSize, ticks: Math.min(4, tableSize - 1), yFmt: v => String(Math.round(v)), tipFmt: v => Math.round(v) });
+
+    lineChart(document.getElementById("chart-points"), cats,
+      [{ name: "Points", color: "var(--series-1)", values: records.map(r => r.points) }],
+      { min: 0, tipFmt: v => Math.round(v) });
+
+    lineChart(document.getElementById("chart-goals"), cats, [
+      { name: "Scored", color: "var(--series-1)", values: records.map(r => r.gf) },
+      { name: "Conceded", color: "var(--series-8)", values: records.map(r => r.ga) },
+    ], { min: 0, tipFmt: v => Math.round(v) });
+
+    const hasXg = records.some(r => r.xg_for != null);
+    if (hasXg) {
+      lineChart(document.getElementById("chart-xg"), cats, [
+        { name: "xG for", color: "var(--series-1)", values: records.map(r => r.xg_for) },
+        { name: "xG against", color: "var(--series-8)", values: records.map(r => r.xg_against) },
+      ], { min: 0, tipFmt: v => fmt(v, 1) });
+    } else {
+      document.getElementById("chart-xg").innerHTML = '<p class="hint">No expected-goals data for this club yet (xG starts 2022/23).</p>';
+    }
+
+    document.getElementById("team-table-title").textContent = `${name} — season by season`;
+    renderTable(document.getElementById("team-table"), [
+      { key: "season", label: "Season" },
+      { key: "position", label: "Finish", num: true, fmt: (v, r) => posBadge(v, r.table_size) },
+      { key: "played", label: "P", num: true },
+      { key: "won", label: "W", num: true },
+      { key: "drawn", label: "D", num: true },
+      { key: "lost", label: "L", num: true },
+      { key: "gf", label: "GF", num: true },
+      { key: "ga", label: "GA", num: true },
+      { key: "gd", label: "GD", num: true, fmt: v => (v > 0 ? "+" : "") + v },
+      { key: "points", label: "Pts", num: true },
+      { key: "xg_for", label: "xG", num: true, fmt: v => v == null ? "-" : fmt(v, 1) },
+      { key: "stat_matches", label: "Stat matches", num: true },
+    ], records, { defaultSort: "season", defaultDir: "asc" });
+
+    const cov = DATA.coverage.find(c => c.team === name);
+    const seasonsPlayed = records.length;
+    const statSeasons = records.filter(r => r.stat_matches > 0).length;
+    let note = `${esc(name)} appears in <b>${seasonsPlayed}</b> of ${meta.seasons.length} seasons in the dataset. Detailed match stats cover <b>${statSeasons}</b> of those seasons`;
+    if (cov) {
+      note += `, with the most recent on <b>${esc(cov.last_stat_date || "n/a")}</b>`;
+      note += cov.in_latest_season ? " (present in the latest season — current profile)." : " (not in the latest season — staler profile).";
+    } else { note += "."; }
+    document.getElementById("team-coverage").innerHTML = note;
+  }
+  renderTeam(defaultTeam);
+
+  // coverage table
+  renderTable(document.getElementById("coverage-table"), [
+    { key: "team", label: "Team" },
+    { key: "in_latest_season", label: "In latest season", fmt: v => v ? '<span class="pill">Yes</span>' : '<span class="delta-down">No</span>' },
+    { key: "stat_matches", label: "Matches with detailed stats", num: true },
+    { key: "recent_stat_matches", label: "Recent (last 3 seasons)", num: true },
+    { key: "last_stat_date", label: "Most recent stat match" },
+  ], DATA.coverage, { defaultSort: "recent_stat_matches", defaultDir: "desc" });
+
+  document.getElementById("footer").textContent = `Generated ${new Date(DATA.generated_at).toLocaleString()} from acca-bot's local Premier League dataset. Regenerate with scripts/build_history_dashboard.py.`;
+
+  document.addEventListener("mousemove", (e) => { if (tooltip.classList.contains("show")) moveTooltip(e); });
+})();
+</script>
+
+</body>
+</html>

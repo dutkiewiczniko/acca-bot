@@ -97,11 +97,30 @@
   header.hero p.sub { margin: 0; color: var(--text-secondary); font-size: 15px; max-width: 70ch; }
   header.hero p.note { margin: 10px 0 0; color: var(--text-muted); font-size: 13px; max-width: 70ch; }
 
+  .period-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+    margin-top: 22px; padding: 12px 14px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .period-controls { display: flex; flex-wrap: wrap; gap: 12px; }
+  .period-controls label { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+  .period-controls select {
+    min-height: 34px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--page); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 650;
+  }
+  .period-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .period-presets button {
+    min-height: 30px; padding: 0 11px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--page); color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+  }
+  .period-presets button:hover { color: var(--text-primary); }
+  .period-presets button.active { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+  .period-summary { color: var(--text-muted); font-size: 12px; margin-left: auto; }
   .kpi-row {
     display: grid;
     grid-template-columns: repeat(6, minmax(0,1fr));
     gap: 12px;
-    margin-top: 26px;
+    margin-top: 18px;
   }
   .kpi {
     background: var(--surface-1);
@@ -228,10 +247,29 @@
   }
 
   @media (max-width: 900px) {
-    .kpi-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .kpi-row { grid-template-columns: repeat(3, minmax(0,1fr)); }
     .card-grid { grid-template-columns: 1fr; }
     .spot-grid { grid-template-columns: 1fr; }
     .barlist .row, .divlist .row { grid-template-columns: 92px 1fr 50px; }
+    .period-summary { margin-left: 0; width: 100%; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 14px 48px; }
+    header.hero { padding: 24px 14px 20px; }
+    .kpi-row { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    .kpi { padding: 11px 11px 9px; }
+    .kpi .value { font-size: 20px; }
+    .period-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .period-controls { flex-direction: column; }
+    .period-controls label { justify-content: space-between; }
+    .period-controls select, .controls-row select.team-select { width: 100%; }
+    .period-presets { justify-content: flex-start; }
+    section.block { padding: 28px 0 8px; }
+    section.block h2 { font-size: 18px; }
+    .card { padding: 13px 13px 15px; }
+    .barlist .row, .divlist .row { grid-template-columns: 84px 1fr 46px; gap: 6px; }
+    .barlist .row .name { font-size: 12px; }
+    nav.tabs a { padding: 11px 10px; }
   }
 </style>
 </head>
@@ -240,7 +278,15 @@
   <div class="wrap">
     <h1>Premier League Data Explorer</h1>
     <p class="sub" id="hero-sub">Loading&hellip;</p>
-    <p class="note">Built from match-by-match results, team stats and computed fixture-importance scores gathered by acca-bot. All figures are team/match level -- the underlying data source has no individual player statistics, so "ones to watch" below are teams, identified from form, points trajectories and expected-goals over/under-performance rather than player ratings.</p>
+    <p class="note">Built from match-by-match results, team stats and computed fixture-importance scores gathered by acca-bot. This page covers team/match-level trends; per-club detail lives in the <a href="pl_team_explorer.html">Team Explorer</a> and per-player stats in <a href="pl_players.html">Players</a>. Use the period control to rescope every chart and table below.</p>
+    <div class="period-bar" id="period-bar">
+      <div class="period-controls">
+        <label>From season <select id="period-from"></select></label>
+        <label>To season <select id="period-to"></select></label>
+      </div>
+      <div class="period-presets" id="period-presets"></div>
+      <span class="period-summary" id="period-summary"></span>
+    </div>
     <div class="kpi-row" id="kpi-row"></div>
   </div>
 </header>
@@ -256,6 +302,8 @@
   <a href="#discipline">Discipline</a>
   <a href="#importance">Big matches</a>
   <a href="#promising">Teams to watch</a>
+  <a href="pl_team_explorer.html" style="margin-left:auto;font-weight:750;color:var(--series-1)">Team Explorer &rarr;</a>
+  <a href="pl_players.html" style="font-weight:750;color:var(--series-1)">Players &rarr;</a>
 </nav>
 
 <div class="wrap">
@@ -377,7 +425,7 @@
 <div class="tooltip" id="tooltip"></div>
 
 <script>
-const DATA = __DASHBOARD_DATA__;
+const RAW = __HOME_RAW__;
 </script>
 <script>
 (function () {
@@ -671,20 +719,238 @@ const DATA = __DASHBOARD_DATA__;
     return { redraw: (newRows) => { rows = newRows; draw(); } };
   }
 
+  // ================= data engine (period-aware, computed in-browser) =================
+
+  const teamName = (id) => RAW.teams[String(id)] || ("#" + id);
+  const seasonLabel = (s) => s + "/" + String(s + 1).slice(-2);
+  const F = { id: 0, season: 1, home: 2, away: 3, hg: 4, ag: 5, date: 6 };
+  const S = { fid: 0, tid: 1, shots: 2, sot: 3, poss: 4, corners: 5, fouls: 6, yellow: 7, red: 8, ptot: 9, pacc: 10, xg: 11 };
+  const I = { season: 0, home: 1, away: 2, hg: 3, ag: 4, date: 5, imp: 6, derby: 7 };
+
+  const fixtureById = new Map();
+  RAW.fixtures.forEach(f => fixtureById.set(f[F.id], f));
+  const statSeasonOf = (row) => { const f = fixtureById.get(row[S.fid]); return f ? f[F.season] : null; };
+  const goalsFor = (fid, tid) => { const f = fixtureById.get(fid); if (!f) return null; return tid === f[F.home] ? f[F.hg] : (tid === f[F.away] ? f[F.ag] : null); };
+  const round = (v, d) => { const m = Math.pow(10, d || 0); return Math.round((v + Number.EPSILON) * m) / m; };
+
+  // final table for one season's fixtures, ranked by points, GD, GF
+  function seasonPositions(fixtures) {
+    const rec = new Map();
+    const get = (tid) => { if (!rec.has(tid)) rec.set(tid, { tid, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 }); return rec.get(tid); };
+    fixtures.forEach(f => {
+      if (f[F.hg] === null || f[F.ag] === null) return;
+      [[f[F.home], f[F.hg], f[F.ag]], [f[F.away], f[F.ag], f[F.hg]]].forEach(([tid, gf, ga]) => {
+        const r = get(tid); r.played++; r.gf += gf; r.ga += ga;
+        if (gf > ga) { r.won++; r.points += 3; } else if (gf === ga) { r.drawn++; r.points += 1; } else r.lost++;
+      });
+    });
+    const arr = [...rec.values()].sort((a, b) => b.points - a.points || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf);
+    arr.forEach((r, i) => r.position = i + 1);
+    return arr;
+  }
+
+  function computeData(fromS, toS) {
+    const seasons = RAW.seasons.filter(s => s >= fromS && s <= toS);
+    const fixtures = RAW.fixtures.filter(f => f[F.season] >= fromS && f[F.season] <= toS);
+    const stats = RAW.stats.filter(r => { const s = statSeasonOf(r); return s !== null && s >= fromS && s <= toS; });
+    const importance = RAW.importance.filter(r => r[I.season] >= fromS && r[I.season] <= toS);
+
+    // per-season positions
+    const posBySeason = new Map();
+    seasons.forEach(s => posBySeason.set(s, seasonPositions(fixtures.filter(f => f[F.season] === s))));
+
+    // ---- season trends ----
+    const statsBySeason = new Map();
+    stats.forEach(r => { const s = statSeasonOf(r); if (!statsBySeason.has(s)) statsBySeason.set(s, []); statsBySeason.get(s).push(r); });
+    const season_trends = seasons.map(s => {
+      const fx = fixtures.filter(f => f[F.season] === s);
+      const n = fx.length;
+      const goals = fx.reduce((a, f) => a + (f[F.hg] || 0) + (f[F.ag] || 0), 0);
+      const homeW = fx.filter(f => (f[F.hg] || 0) > (f[F.ag] || 0)).length;
+      const draws = fx.filter(f => (f[F.hg] || 0) === (f[F.ag] || 0)).length;
+      const st = statsBySeason.get(s) || [];
+      const cards = st.filter(r => r[S.yellow] !== null).map(r => r[S.yellow] + (r[S.red] || 0));
+      const shots = st.filter(r => r[S.shots] !== null).map(r => r[S.shots]);
+      const xg = st.filter(r => r[S.xg] !== null).map(r => r[S.xg]);
+      const positions = posBySeason.get(s) || [];
+      const size = positions.length;
+      const relegated = positions.filter(r => r.position >= size - 2).map(r => teamName(r.tid));
+      return {
+        season: seasonLabel(s),
+        matches: n,
+        avg_goals_per_game: n ? round(goals / n, 3) : 0,
+        home_win_pct: n ? round(homeW / n, 4) : 0,
+        draw_pct: n ? round(draws / n, 4) : 0,
+        away_win_pct: n ? round((n - homeW - draws) / n, 4) : 0,
+        avg_cards_per_team: cards.length ? round(cards.reduce((a, b) => a + b, 0) / cards.length, 2) : null,
+        avg_shots_per_team: shots.length ? round(shots.reduce((a, b) => a + b, 0) / shots.length, 2) : null,
+        avg_xg_per_team: xg.length ? round(xg.reduce((a, b) => a + b, 0) / xg.length, 3) : null,
+        champion: positions.length ? teamName(positions[0].tid) : null,
+        relegated,
+      };
+    });
+
+    // ---- all-time (in-range) team table ----
+    const agg = new Map();
+    const getA = (tid) => { if (!agg.has(tid)) agg.set(tid, { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, seasons: new Set() }); return agg.get(tid); };
+    fixtures.forEach(f => {
+      if (f[F.hg] === null || f[F.ag] === null) return;
+      [[f[F.home], f[F.hg], f[F.ag]], [f[F.away], f[F.ag], f[F.hg]]].forEach(([tid, gf, ga]) => {
+        const r = getA(tid); r.played++; r.gf += gf; r.ga += ga; r.seasons.add(f[F.season]);
+        if (gf > ga) r.won++; else if (gf === ga) r.drawn++; else r.lost++;
+      });
+    });
+    const titles = new Map(), top4 = new Map(), relegations = new Map(), bestPos = new Map();
+    const inc = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+    posBySeason.forEach(positions => {
+      const size = positions.length;
+      positions.forEach(r => {
+        if (r.position === 1) inc(titles, r.tid);
+        if (r.position <= 4) inc(top4, r.tid);
+        if (r.position >= size - 2) inc(relegations, r.tid);
+        if (!bestPos.has(r.tid) || r.position < bestPos.get(r.tid)) bestPos.set(r.tid, r.position);
+      });
+    });
+    const team_table = [...agg.entries()].filter(([, r]) => r.played > 0).map(([tid, r]) => {
+      const points = r.won * 3 + r.drawn;
+      return {
+        team: teamName(tid), seasons: r.seasons.size, played: r.played, won: r.won, drawn: r.drawn, lost: r.lost,
+        gf: r.gf, ga: r.ga, gd: r.gf - r.ga, points, ppg: round(points / r.played, 3),
+        titles: titles.get(tid) || 0, top4: top4.get(tid) || 0, relegations: relegations.get(tid) || 0,
+        best_position: bestPos.get(tid) || null,
+      };
+    }).sort((a, b) => b.points - a.points || b.ppg - a.ppg);
+
+    // ---- style / xg / discipline / shot efficiency (from stats) ----
+    const style = new Map();
+    const getS = (tid) => { if (!style.has(tid)) style.set(tid, { n: 0, poss: [0, 0], shots: [0, 0], sot: [0, 0], corners: [0, 0], fouls: [0, 0], ptot: 0, pacc: 0 }); return style.get(tid); };
+    const addAvg = (slot, v) => { if (v !== null) { slot[0] += v; slot[1] += 1; } };
+    const xgAgg = new Map(), disc = new Map(), shotEff = new Map();
+    const getX = (tid) => { if (!xgAgg.has(tid)) xgAgg.set(tid, { xg: 0, goals: 0, matches: 0 }); return xgAgg.get(tid); };
+    const getD = (tid) => { if (!disc.has(tid)) disc.set(tid, { yellow: 0, red: 0, fouls: 0, matches: 0 }); return disc.get(tid); };
+    const getE = (tid) => { if (!shotEff.has(tid)) shotEff.set(tid, { shots: 0, sot: 0, goals: 0, matches: 0 }); return shotEff.get(tid); };
+    stats.forEach(r => {
+      const tid = r[S.tid];
+      const sl = getS(tid); sl.n++;
+      addAvg(sl.poss, r[S.poss]); addAvg(sl.shots, r[S.shots]); addAvg(sl.sot, r[S.sot]);
+      addAvg(sl.corners, r[S.corners]); addAvg(sl.fouls, r[S.fouls]);
+      if (r[S.ptot] !== null) { sl.ptot += r[S.ptot]; sl.pacc += (r[S.pacc] || 0); }
+      const g = goalsFor(r[S.fid], tid);
+      if (r[S.xg] !== null && g !== null) { const x = getX(tid); x.xg += r[S.xg]; x.goals += g; x.matches++; }
+      if (r[S.yellow] !== null) { const d = getD(tid); d.yellow += r[S.yellow]; d.red += (r[S.red] || 0); d.fouls += (r[S.fouls] || 0); d.matches++; }
+      if (r[S.shots] !== null && g !== null) { const e = getE(tid); e.shots += r[S.shots]; e.sot += (r[S.sot] || 0); e.goals += g; e.matches++; }
+    });
+    const avg = (slot) => slot[1] ? round(slot[0] / slot[1], 2) : null;
+    const team_style = [...style.entries()].filter(([, r]) => r.n >= 20).map(([tid, r]) => ({
+      team: teamName(tid), matches_sampled: r.n, avg_possession: avg(r.poss), avg_shots: avg(r.shots),
+      avg_shots_on_target: avg(r.sot), avg_corners: avg(r.corners), avg_fouls: avg(r.fouls),
+      pass_accuracy: r.ptot > 0 ? round(100 * r.pacc / r.ptot, 1) : null,
+    })).sort((a, b) => (b.avg_possession || 0) - (a.avg_possession || 0));
+    const xg_performance = [...xgAgg.entries()].filter(([, r]) => r.matches >= 15).map(([tid, r]) => {
+      const diff = r.goals - r.xg;
+      return { team: teamName(tid), matches: r.matches, xg_for: round(r.xg, 2), goals_for: r.goals, diff: round(diff, 2), diff_per_game: round(diff / r.matches, 3) };
+    }).sort((a, b) => b.diff_per_game - a.diff_per_game);
+    const discipline = [...disc.entries()].filter(([, r]) => r.matches >= 20).map(([tid, r]) => ({
+      team: teamName(tid), matches: r.matches, yellow: r.yellow, red: r.red,
+      fouls_per_game: round(r.fouls / r.matches, 2), cards_per_game: round((r.yellow + r.red) / r.matches, 3),
+      trouble_score: round((r.yellow + r.red * 2) / r.matches, 3),
+    })).sort((a, b) => b.trouble_score - a.trouble_score);
+    const shot_efficiency = [...shotEff.entries()].filter(([, r]) => r.matches >= 20 && r.shots > 0).map(([tid, r]) => ({
+      team: teamName(tid), matches: r.matches, shots_per_game: round(r.shots / r.matches, 2),
+      conversion_pct: round(100 * r.goals / r.shots, 2), sot_pct: r.shots ? round(100 * r.sot / r.shots, 2) : null,
+      goals_per_game: round(r.goals / r.matches, 2),
+    })).sort((a, b) => b.conversion_pct - a.conversion_pct);
+
+    // ---- importance / derbies ----
+    const impSorted = [...importance].sort((a, b) => b[I.imp] - a[I.imp]);
+    const top_matches = impSorted.slice(0, 15).map(r => ({
+      season: seasonLabel(r[I.season]), date: r[I.date], home: teamName(r[I.home]), away: teamName(r[I.away]),
+      score: r[I.hg] === null ? "" : (r[I.hg] + "-" + r[I.ag]), importance: round(r[I.imp], 3), is_derby: !!r[I.derby],
+    }));
+    const derbyPairs = new Map();
+    let derby_count = 0;
+    importance.forEach(r => { if (r[I.derby]) { derby_count++; const pair = [teamName(r[I.home]), teamName(r[I.away])].sort().join(" vs "); derbyPairs.set(pair, (derbyPairs.get(pair) || 0) + 1); } });
+    const top_derby_fixtures = [...derbyPairs.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([pair, meetings]) => ({ pair, meetings }));
+    const avg_importance = importance.length ? round(importance.reduce((a, r) => a + r[I.imp], 0) / importance.length, 4) : 0;
+
+    // ---- promising: last season in range vs two earlier ----
+    const latest = seasons[seasons.length - 1];
+    const earlier = seasons.length >= 3 ? seasons[seasons.length - 3] : seasons[0];
+    const finalPoints = (s) => { const m = new Map(); (posBySeason.get(s) || []).forEach(r => m.set(r.tid, r.points)); return m; };
+    const lp = finalPoints(latest), ep = finalPoints(earlier);
+    const points_trend = [];
+    lp.forEach((pts, tid) => { if (ep.has(tid)) points_trend.push({ team: teamName(tid), points_latest: pts, points_earlier: ep.get(tid), delta: pts - ep.get(tid), latest_season: seasonLabel(latest), earlier_season: seasonLabel(earlier) }); });
+    points_trend.sort((a, b) => b.delta - a.delta);
+
+    const total_goals = fixtures.reduce((a, f) => a + (f[F.hg] || 0) + (f[F.ag] || 0), 0);
+    const teamCount = new Set([].concat(...fixtures.map(f => [f[F.home], f[F.away]]))).size;
+    const meta = {
+      league: RAW.league, first_season: seasonLabel(fromS), last_season: seasonLabel(toS),
+      season_count: seasons.length, fixture_count: fixtures.length, team_count: teamCount,
+      total_goals, avg_goals_per_game: fixtures.length ? round(total_goals / fixtures.length, 3) : 0,
+    };
+
+    const data = {
+      generated_at: RAW.generated_at, meta, season_trends, team_table, team_style, xg_performance,
+      discipline, importance: { top_matches, top_derby_fixtures, derby_count, total_matches: importance.length, avg_importance },
+      promising: { points_trend, latest_season: seasonLabel(latest), earlier_season: seasonLabel(earlier) },
+      shot_efficiency,
+    };
+    data.spotlights = computeSpotlights(data);
+    return data;
+  }
+
+  function computeSpotlights(d) {
+    const out = [];
+    const st = d.season_trends;
+    if (st.length >= 2) {
+      const first = st[0], last = st[st.length - 1];
+      const delta = round((last.home_win_pct - first.home_win_pct) * 100, 1);
+      out.push({ title: "Home advantage is shifting", detail: `Home win rate has ${delta < 0 ? "fallen" : "risen"} from ${(first.home_win_pct * 100).toFixed(1)}% in ${first.season} to ${(last.home_win_pct * 100).toFixed(1)}% in ${last.season} (${delta >= 0 ? "+" : ""}${delta.toFixed(1)} pts).` });
+    }
+    if (d.team_table.length) {
+      const mostTitles = d.team_table.reduce((a, b) => b.titles > a.titles ? b : a);
+      if (mostTitles.titles > 0) out.push({ title: `${mostTitles.team} lead the era`, detail: `${mostTitles.titles} ${mostTitles.titles === 1 ? "title" : "titles"}, ${mostTitles.points} points and a +${mostTitles.gd} goal difference across ${mostTitles.seasons} seasons in range.` });
+      const bestPpg = d.team_table.reduce((a, b) => b.ppg > a.ppg ? b : a);
+      out.push({ title: `${bestPpg.team}: best points-per-game`, detail: `${fmt(bestPpg.ppg, 2)} points per game across ${bestPpg.played} matches -- the highest sustained rate in this period.` });
+    }
+    if (d.xg_performance.length) {
+      const clinical = d.xg_performance[0], wasteful = d.xg_performance[d.xg_performance.length - 1];
+      out.push({ title: `${clinical.team}: most clinical finishing`, detail: `Scored ${clinical.diff >= 0 ? "+" : ""}${fmt(clinical.diff, 1)} goals vs expected (${clinical.goals_for} from ${fmt(clinical.xg_for, 1)} xG).` });
+      if (wasteful.diff < 0) out.push({ title: `${wasteful.team}: underperforming their chances`, detail: `${fmt(wasteful.diff, 1)} goals below expected (${wasteful.goals_for} from ${fmt(wasteful.xg_for, 1)} xG) -- due a positive correction if their process holds.` });
+    }
+    if (d.promising.points_trend.length) {
+      const riser = d.promising.points_trend[0];
+      if (riser.delta > 0) out.push({ title: `${riser.team}: team on the rise`, detail: `+${riser.delta} points from ${riser.earlier_season} to ${riser.latest_season} (${riser.points_earlier} to ${riser.points_latest}) -- the biggest improvement.` });
+    }
+    if (d.discipline.length) {
+      const cleanest = d.discipline.reduce((a, b) => b.trouble_score < a.trouble_score ? b : a);
+      out.push({ title: `${cleanest.team}: cleanest disciplinary record`, detail: `Just ${fmt(cleanest.cards_per_game, 2)} cards per game across ${cleanest.matches} sampled matches.` });
+    }
+    if (d.shot_efficiency.length) {
+      const sharp = d.shot_efficiency[0];
+      out.push({ title: `${sharp.team}: sharpest shooters`, detail: `Converts ${fmt(sharp.conversion_pct, 1)}% of shots into goals (${fmt(sharp.goals_per_game, 2)} goals/game from ${fmt(sharp.shots_per_game, 1)} shots/game).` });
+    }
+    return out;
+  }
+
   // ================= build the page =================
 
-  function init() {
+  let DATA = null;
+  let teamSearchQuery = "";
+
+  function renderAll() {
     const meta = DATA.meta;
     document.getElementById("hero-sub").textContent =
       `${meta.league} • ${meta.first_season}–${meta.last_season} • ${meta.season_count} seasons • ${meta.fixture_count.toLocaleString()} fixtures • ${meta.team_count} teams`;
 
     const kpis = [
-      { label: "Seasons tracked", value: meta.season_count },
+      { label: "Seasons in view", value: meta.season_count },
       { label: "Fixtures", value: meta.fixture_count.toLocaleString() },
       { label: "Total goals", value: meta.total_goals.toLocaleString() },
       { label: "Goals / game", value: fmt(meta.avg_goals_per_game, 2) },
-      { label: "Teams tracked", value: meta.team_count },
-      { label: "Latest champion", value: DATA.season_trends[DATA.season_trends.length - 1].champion },
+      { label: "Teams in view", value: meta.team_count },
+      { label: "Latest champion", value: DATA.season_trends.length ? DATA.season_trends[DATA.season_trends.length - 1].champion : "-" },
     ];
     document.getElementById("kpi-row").innerHTML = kpis.map(k => `<div class="kpi"><p class="label">${esc(k.label)}</p><p class="value">${esc(k.value)}</p></div>`).join("");
 
@@ -704,9 +970,13 @@ const DATA = __DASHBOARD_DATA__;
     ]);
 
     const cardSeasons = st.filter(s => s.avg_cards_per_team !== null);
-    lineChart(document.getElementById("chart-cards"), cardSeasons.map(s => s.season), [
-      { name: "Cards / team / game", color: "var(--series-1)", values: cardSeasons.map(s => s.avg_cards_per_team) },
-    ], { tipFmt: v => fmt(v, 2), endLabel: true });
+    if (cardSeasons.length) {
+      lineChart(document.getElementById("chart-cards"), cardSeasons.map(s => s.season), [
+        { name: "Cards / team / game", color: "var(--series-1)", values: cardSeasons.map(s => s.avg_cards_per_team) },
+      ], { tipFmt: v => fmt(v, 2), endLabel: true });
+    } else {
+      document.getElementById("chart-cards").innerHTML = '<p class="hint">No card data in this period (available from 2014/15).</p>';
+    }
 
     const xgSeasons = st.filter(s => s.avg_xg_per_team !== null);
     if (xgSeasons.length) {
@@ -737,12 +1007,8 @@ const DATA = __DASHBOARD_DATA__;
       { key: "top4", label: "Top 4", num: true },
       { key: "best_position", label: "Best pos.", num: true },
     ];
-    const teamTableEl = document.getElementById("team-table");
-    const teamTableApi = renderTable(teamTableEl, teamColumns, DATA.team_table, { defaultSort: "points", defaultDir: "desc" });
-    document.getElementById("team-search").addEventListener("input", (e) => {
-      const q = e.target.value.trim().toLowerCase();
-      teamTableApi.redraw(DATA.team_table.filter(r => r.team.toLowerCase().includes(q)));
-    });
+    const filteredTeams = DATA.team_table.filter(r => r.team.toLowerCase().includes(teamSearchQuery));
+    renderTable(document.getElementById("team-table"), teamColumns, filteredTeams, { defaultSort: "points", defaultDir: "desc" });
 
     // ---- leaderboards ----
     const byPoints = [...DATA.team_table].sort((a, b) => b.points - a.points).slice(0, 12);
@@ -762,38 +1028,52 @@ const DATA = __DASHBOARD_DATA__;
     }
 
     // ---- playing style ----
-    const byPossession = [...DATA.team_style].sort((a, b) => b.avg_possession - a.avg_possession).slice(0, 12);
-    hBarList(document.getElementById("chart-possession"), byPossession, { valueKey: "avg_possession", fmtValue: v => fmt(v, 1) + "%" });
-
-    const byShots = [...DATA.team_style].sort((a, b) => b.avg_shots - a.avg_shots).slice(0, 12);
-    hBarList(document.getElementById("chart-shots"), byShots, { valueKey: "avg_shots", fmtValue: v => fmt(v, 1) });
-
-    const byPassAcc = [...DATA.team_style].filter(t => t.pass_accuracy !== null).sort((a, b) => b.pass_accuracy - a.pass_accuracy).slice(0, 12);
-    hBarList(document.getElementById("chart-passacc"), byPassAcc, { valueKey: "pass_accuracy", fmtValue: v => fmt(v, 1) + "%" });
-
-    const byCorners = [...DATA.team_style].sort((a, b) => b.avg_corners - a.avg_corners).slice(0, 12);
-    hBarList(document.getElementById("chart-corners"), byCorners, { valueKey: "avg_corners", fmtValue: v => fmt(v, 1) });
+    const noStats = '<p class="hint">No detailed match stats in this period (available from 2014/15).</p>';
+    if (DATA.team_style.length) {
+      const byPossession = [...DATA.team_style].sort((a, b) => b.avg_possession - a.avg_possession).slice(0, 12);
+      hBarList(document.getElementById("chart-possession"), byPossession, { valueKey: "avg_possession", fmtValue: v => fmt(v, 1) + "%" });
+      const byShots = [...DATA.team_style].sort((a, b) => b.avg_shots - a.avg_shots).slice(0, 12);
+      hBarList(document.getElementById("chart-shots"), byShots, { valueKey: "avg_shots", fmtValue: v => fmt(v, 1) });
+      const byPassAcc = [...DATA.team_style].filter(t => t.pass_accuracy !== null).sort((a, b) => b.pass_accuracy - a.pass_accuracy).slice(0, 12);
+      hBarList(document.getElementById("chart-passacc"), byPassAcc, { valueKey: "pass_accuracy", fmtValue: v => fmt(v, 1) + "%" });
+      const byCorners = [...DATA.team_style].sort((a, b) => b.avg_corners - a.avg_corners).slice(0, 12);
+      hBarList(document.getElementById("chart-corners"), byCorners, { valueKey: "avg_corners", fmtValue: v => fmt(v, 1) });
+    } else {
+      ["chart-possession", "chart-shots", "chart-passacc", "chart-corners"].forEach(id => document.getElementById(id).innerHTML = noStats);
+    }
 
     // ---- xG performance (diverging) ----
-    const xgSorted = [...DATA.xg_performance].sort((a, b) => b.diff_per_game - a.diff_per_game);
-    divBarList(document.getElementById("chart-xgdiff"), xgSorted, {
-      valueKey: "diff_per_game",
-      fmtValue: v => (v > 0 ? "+" : "") + fmt(v, 2),
-      tooltip: d => `<b>${esc(d.team)}</b><br>${d.goals_for} goals from ${fmt(d.xg_for, 1)} xG (${d.matches} matches)<br>${(d.diff_per_game > 0 ? "+" : "")}${fmt(d.diff_per_game, 3)} goals/game vs. xG`,
-    });
-    addTableToggle("chart-xgdiff", ["Team", "Matches", "xG", "Goals", "Diff/game"], xgSorted.map(d => [d.team, d.matches, fmt(d.xg_for,1), d.goals_for, (d.diff_per_game>0?"+":"")+fmt(d.diff_per_game,3)]));
+    if (DATA.xg_performance.length) {
+      const xgSorted = [...DATA.xg_performance].sort((a, b) => b.diff_per_game - a.diff_per_game);
+      divBarList(document.getElementById("chart-xgdiff"), xgSorted, {
+        valueKey: "diff_per_game",
+        fmtValue: v => (v > 0 ? "+" : "") + fmt(v, 2),
+        tooltip: d => `<b>${esc(d.team)}</b><br>${d.goals_for} goals from ${fmt(d.xg_for, 1)} xG (${d.matches} matches)<br>${(d.diff_per_game > 0 ? "+" : "")}${fmt(d.diff_per_game, 3)} goals/game vs. xG`,
+      });
+      addTableToggle("chart-xgdiff", ["Team", "Matches", "xG", "Goals", "Diff/game"], xgSorted.map(d => [d.team, d.matches, fmt(d.xg_for,1), d.goals_for, (d.diff_per_game>0?"+":"")+fmt(d.diff_per_game,3)]));
+    } else {
+      document.getElementById("chart-xgdiff").innerHTML = '<p class="hint">No expected-goals data in this period (available from 2022/23).</p>';
+    }
 
     // ---- shot efficiency scatter ----
-    scatterChart(document.getElementById("chart-scatter"), DATA.shot_efficiency.map(d => ({ x: d.shots_per_game, y: d.conversion_pct, label: d.team })), {
-      xLabel: "Shots per game", yLabel: "Conversion rate (%)",
-    });
-    addTableToggle("chart-scatter", ["Team", "Shots/game", "Conversion %", "Goals/game"], [...DATA.shot_efficiency].sort((a,b)=>b.conversion_pct-a.conversion_pct).map(d => [d.team, fmt(d.shots_per_game,1), fmt(d.conversion_pct,1)+"%", fmt(d.goals_per_game,2)]));
+    if (DATA.shot_efficiency.length) {
+      scatterChart(document.getElementById("chart-scatter"), DATA.shot_efficiency.map(d => ({ x: d.shots_per_game, y: d.conversion_pct, label: d.team })), {
+        xLabel: "Shots per game", yLabel: "Conversion rate (%)",
+      });
+      addTableToggle("chart-scatter", ["Team", "Shots/game", "Conversion %", "Goals/game"], [...DATA.shot_efficiency].sort((a,b)=>b.conversion_pct-a.conversion_pct).map(d => [d.team, fmt(d.shots_per_game,1), fmt(d.conversion_pct,1)+"%", fmt(d.goals_per_game,2)]));
+    } else {
+      document.getElementById("chart-scatter").innerHTML = noStats;
+    }
 
     // ---- discipline ----
-    const worstDiscipline = [...DATA.discipline].sort((a, b) => b.trouble_score - a.trouble_score).slice(0, 10);
-    hBarList(document.getElementById("chart-cards-worst"), worstDiscipline, { valueKey: "cards_per_game", fmtValue: v => fmt(v, 2) });
-    const bestDiscipline = [...DATA.discipline].sort((a, b) => a.trouble_score - b.trouble_score).slice(0, 10);
-    hBarList(document.getElementById("chart-cards-best"), bestDiscipline, { valueKey: "cards_per_game", fmtValue: v => fmt(v, 2), alt: true });
+    if (DATA.discipline.length) {
+      const worstDiscipline = [...DATA.discipline].sort((a, b) => b.trouble_score - a.trouble_score).slice(0, 10);
+      hBarList(document.getElementById("chart-cards-worst"), worstDiscipline, { valueKey: "cards_per_game", fmtValue: v => fmt(v, 2) });
+      const bestDiscipline = [...DATA.discipline].sort((a, b) => a.trouble_score - b.trouble_score).slice(0, 10);
+      hBarList(document.getElementById("chart-cards-best"), bestDiscipline, { valueKey: "cards_per_game", fmtValue: v => fmt(v, 2), alt: true });
+    } else {
+      ["chart-cards-worst", "chart-cards-best"].forEach(id => document.getElementById(id).innerHTML = noStats);
+    }
 
     // ---- importance ----
     renderTable(document.getElementById("importance-table"), [
@@ -811,12 +1091,16 @@ const DATA = __DASHBOARD_DATA__;
     ], DATA.importance.top_derby_fixtures, { defaultSort: "meetings", defaultDir: "desc" });
 
     // ---- promising teams ----
-    const promising = DATA.promising.points_trend.slice(0, 20);
-    divBarList(document.getElementById("chart-promising"), promising, {
-      valueKey: "delta",
-      fmtValue: v => (v > 0 ? "+" : "") + v,
-      tooltip: d => `<b>${esc(d.team)}</b><br>${d.points_earlier} pts (${esc(d.earlier_season)}) &rarr; ${d.points_latest} pts (${esc(d.latest_season)})<br>${(d.delta>0?"+":"")+d.delta} points`,
-    });
+    if (DATA.promising.points_trend.length) {
+      const promising = DATA.promising.points_trend.slice(0, 20);
+      divBarList(document.getElementById("chart-promising"), promising, {
+        valueKey: "delta",
+        fmtValue: v => (v > 0 ? "+" : "") + v,
+        tooltip: d => `<b>${esc(d.team)}</b><br>${d.points_earlier} pts (${esc(d.earlier_season)}) &rarr; ${d.points_latest} pts (${esc(d.latest_season)})<br>${(d.delta>0?"+":"")+d.delta} points`,
+      });
+    } else {
+      document.getElementById("chart-promising").innerHTML = '<p class="hint">Need at least two seasons in the selected period to compare.</p>';
+    }
 
     document.getElementById("footer").textContent = `Generated ${new Date(DATA.generated_at).toLocaleString()} from acca-bot's local Premier League dataset (data/acca-bot.sqlite3). Regenerate with scripts/build_history_dashboard.py.`;
   }
@@ -835,8 +1119,73 @@ const DATA = __DASHBOARD_DATA__;
     container.appendChild(details);
   }
 
+  // ================= period control + first render =================
+
+  const SEASONS = RAW.seasons.slice();
+  const MIN_S = SEASONS[0], MAX_S = SEASONS[SEASONS.length - 1];
+  let fromS = MIN_S, toS = MAX_S;
+
+  const fromSel = document.getElementById("period-from");
+  const toSel = document.getElementById("period-to");
+  const summaryEl = document.getElementById("period-summary");
+
+  function optionHtml(selectedFrom) {
+    return SEASONS.map(s => `<option value="${s}">${seasonLabel(s)}</option>`).join("");
+  }
+  fromSel.innerHTML = optionHtml();
+  toSel.innerHTML = optionHtml();
+  fromSel.value = String(fromS);
+  toSel.value = String(toS);
+
+  const presets = [
+    { label: "All", from: MIN_S, to: MAX_S },
+    { label: "Last 3", from: Math.max(MIN_S, MAX_S - 2), to: MAX_S },
+    { label: "Last 5", from: Math.max(MIN_S, MAX_S - 4), to: MAX_S },
+    { label: "Last 10", from: Math.max(MIN_S, MAX_S - 9), to: MAX_S },
+    { label: "xG era", from: Math.max(MIN_S, 2022), to: MAX_S },
+  ];
+  const presetsEl = document.getElementById("period-presets");
+  presetsEl.innerHTML = presets.map((p, i) => `<button type="button" data-i="${i}">${esc(p.label)}</button>`).join("");
+
+  function refresh() {
+    if (fromS > toS) { const t = fromS; fromS = toS; toS = t; }
+    fromSel.value = String(fromS);
+    toSel.value = String(toS);
+    const n = SEASONS.filter(s => s >= fromS && s <= toS).length;
+    summaryEl.textContent = `${seasonLabel(fromS)}–${seasonLabel(toS)} · ${n} season${n === 1 ? "" : "s"}`;
+    presetsEl.querySelectorAll("button").forEach(b => {
+      const p = presets[+b.dataset.i];
+      b.classList.toggle("active", p.from === fromS && p.to === toS);
+    });
+    DATA = computeData(fromS, toS);
+    renderAll();
+  }
+
+  fromSel.addEventListener("change", () => { fromS = +fromSel.value; refresh(); });
+  toSel.addEventListener("change", () => { toS = +toSel.value; refresh(); });
+  presetsEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("button"); if (!btn) return;
+    const p = presets[+btn.dataset.i]; fromS = p.from; toS = p.to; refresh();
+  });
+  document.getElementById("team-search").addEventListener("input", (e) => {
+    teamSearchQuery = e.target.value.trim().toLowerCase();
+    const teamColumns = [
+      { key: "team", label: "Team" }, { key: "seasons", label: "Seasons", num: true },
+      { key: "played", label: "Played", num: true }, { key: "won", label: "W", num: true },
+      { key: "drawn", label: "D", num: true }, { key: "lost", label: "L", num: true },
+      { key: "gf", label: "GF", num: true }, { key: "ga", label: "GA", num: true },
+      { key: "gd", label: "GD", num: true, fmt: v => (v > 0 ? "+" : "") + v },
+      { key: "points", label: "Pts", num: true }, { key: "ppg", label: "PPG", num: true, fmt: v => fmt(v, 2) },
+      { key: "titles", label: "Titles", num: true }, { key: "top4", label: "Top 4", num: true },
+      { key: "best_position", label: "Best pos.", num: true },
+    ];
+    renderTable(document.getElementById("team-table"), teamColumns,
+      DATA.team_table.filter(r => r.team.toLowerCase().includes(teamSearchQuery)),
+      { defaultSort: "points", defaultDir: "desc" });
+  });
+
   document.addEventListener("mousemove", moveTooltip);
-  init();
+  refresh();
 })();
 </script>
 </body>

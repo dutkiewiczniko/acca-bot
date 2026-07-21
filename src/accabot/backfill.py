@@ -21,6 +21,13 @@ class BackfillReport:
     daily_budget_hit: bool = False
     rate_limited: bool = False
     error: str | None = None
+    players_stored: int = 0
+    teams_stats_stored: int = 0
+    teams_pending: list[int] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.teams_pending is None:
+            self.teams_pending = []
 
 
 def backfill_season(
@@ -66,6 +73,58 @@ def backfill_season(
         report.stats_remaining = len(storage.fetch_fixtures_missing_stats(conn, league_id=league_id, season=season))
 
     report.importance_scored = compute_and_store_importance(conn, league_id=league_id, season=season)
+    return report
+
+
+def backfill_player_and_team_stats(
+    client: ApiFootballClient,
+    conn: sqlite3.Connection,
+    *,
+    league_id: int = PREMIER_LEAGUE_ID,
+    season: int,
+) -> BackfillReport:
+    """Pull per-player season stats and per-team season aggregates for one season.
+
+    Requires the season's fixtures to already be backfilled (team ids are read
+    from stored fixtures, not fetched fresh - no fixtures API call spent here).
+    Resumable: teams already stored for this season/league are skipped on a
+    re-run, so hitting the daily budget partway through just means running
+    the same command again once the budget refills.
+    """
+    report = BackfillReport()
+    team_ids = storage.fetch_teams_for_season(conn, league_id=league_id, season=season)
+    already_done = storage.fetch_teams_with_season_stats(conn, league_id=league_id, season=season)
+    pending = [team_id for team_id in team_ids if team_id not in already_done]
+
+    for team_id in pending:
+        try:
+            page = 1
+            while True:
+                payload = client.players(league=league_id, season=season, team=team_id, page=page)
+                errors = payload.get("errors")
+                if errors:
+                    report.error = str(errors)
+                    break
+                report.players_stored += storage.store_players_payload(conn, payload, league_id=league_id, season=season)
+                paging = payload.get("paging") or {}
+                if page >= (paging.get("total") or 1):
+                    break
+                page += 1
+
+            stats_payload = client.team_statistics(league=league_id, season=season, team=team_id)
+            if storage.store_team_statistics_payload(conn, stats_payload, league_id=league_id, season=season, team_id=team_id):
+                report.teams_stats_stored += 1
+        except DailyBudgetExceeded:
+            report.daily_budget_hit = True
+            break
+        except RateLimitedError as exc:
+            report.rate_limited = True
+            report.error = str(exc)
+            break
+
+    report.teams_pending = [
+        team_id for team_id in team_ids if team_id not in storage.fetch_teams_with_season_stats(conn, league_id=league_id, season=season)
+    ]
     return report
 
 

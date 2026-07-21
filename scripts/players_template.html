@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Premier League — Players</title>
+  <style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good-text:      #006300;
+
+    --series-1: #2a78d6; /* blue   */
+    --series-2: #008300; /* green  */
+    --series-3: #e87ba4; /* magenta*/
+    --series-4: #eda100; /* yellow */
+    --series-5: #1baf7a; /* aqua   */
+    --series-6: #eb6834; /* orange */
+    --series-7: #4a3aa7; /* violet */
+    --series-8: #e34948; /* red    */
+
+    --seq-100: #cde2fb; --seq-150: #b7d3f6; --seq-200: #9ec5f4; --seq-250: #86b6ef;
+    --seq-300: #6da7ec; --seq-350: #5598e7; --seq-400: #3987e5; --seq-450: #2a78d6;
+    --seq-500: #256abf; --seq-550: #1c5cab; --seq-600: #184f95; --seq-650: #104281;
+    --seq-700: #0d366b;
+
+    --div-pos: #2a78d6;  /* blue */
+    --div-neg: #e34948;  /* red */
+    --div-mid: #f0efec;
+
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --good-text:      #0ca30c;
+
+      --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+      --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+
+      --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --good-text:      #0ca30c;
+
+    --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+    --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+
+    --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body.viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 64px; }
+
+  header.hero {
+    padding: 40px 20px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-1);
+  }
+  header.hero .wrap { padding-bottom: 0; }
+  header.hero h1 { margin: 0 0 6px; font-size: clamp(24px, 4vw, 34px); font-weight: 750; }
+  header.hero p.sub { margin: 0; color: var(--text-secondary); font-size: 15px; max-width: 70ch; }
+  header.hero p.note { margin: 10px 0 0; color: var(--text-muted); font-size: 13px; max-width: 70ch; }
+
+  .period-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+    margin-top: 22px; padding: 12px 14px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .period-controls { display: flex; flex-wrap: wrap; gap: 12px; }
+  .period-controls label { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+  .period-controls select {
+    min-height: 34px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--page); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 650;
+  }
+  .period-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .period-presets button {
+    min-height: 30px; padding: 0 11px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--page); color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+  }
+  .period-presets button:hover { color: var(--text-primary); }
+  .period-presets button.active { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+  .period-summary { color: var(--text-muted); font-size: 12px; margin-left: auto; }
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0,1fr));
+    gap: 12px;
+    margin-top: 18px;
+  }
+  .kpi {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 14px 12px;
+    min-width: 0;
+  }
+  .kpi .label { color: var(--text-secondary); font-size: 12px; margin: 0 0 6px; }
+  .kpi .value { font-size: 24px; font-weight: 700; margin: 0; }
+  .kpi .value small { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+
+  nav.tabs {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; gap: 2px; overflow-x: auto;
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+  }
+  nav.tabs a {
+    display: inline-block; padding: 12px 14px; font-size: 13px; font-weight: 650;
+    color: var(--text-secondary); text-decoration: none; white-space: nowrap;
+    border-bottom: 2px solid transparent;
+  }
+  nav.tabs a:hover { color: var(--text-primary); border-bottom-color: var(--baseline); }
+
+  section.block { padding: 40px 0 8px; border-bottom: 1px solid var(--border); }
+  section.block:last-of-type { border-bottom: none; }
+  section.block h2 { font-size: 20px; margin: 0 0 4px; scroll-margin-top: 56px; }
+  section.block p.desc { color: var(--text-secondary); margin: 0 0 20px; max-width: 78ch; font-size: 13.5px; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 18px; min-width: 0;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  .card h3 { font-size: 14px; margin: 0 0 2px; }
+  .card p.hint { margin: 0 0 14px; color: var(--text-muted); font-size: 12px; }
+
+  .spot-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+  .spot {
+    background: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--series-1);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .spot h3 { margin: 0 0 6px; font-size: 14px; }
+  .spot p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+
+  /* bar chart (HTML/CSS based) */
+  .barlist { display: flex; flex-direction: column; gap: 6px; }
+  .barlist .row { display: grid; grid-template-columns: 128px 1fr 56px; align-items: center; gap: 8px; }
+  .barlist .row .name { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barlist .row .track { position: relative; height: 16px; background: var(--grid); border-radius: 4px; overflow: hidden; }
+  .barlist .row .fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .barlist .row .fill.alt { background: var(--series-5); }
+  .barlist .row .val { font-size: 12.5px; color: var(--text-primary); font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+  .barlist .row.highlight .name, .barlist .row.highlight .val { color: var(--text-primary); font-weight: 750; }
+
+  /* diverging bar */
+  .divlist .row { display: grid; grid-template-columns: 128px 1fr 64px; align-items: center; gap: 8px; }
+  .divlist .row .name { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .divlist .row .track { position: relative; height: 16px; background: var(--div-mid); border-radius: 4px; overflow: hidden; }
+  .divlist .row .track::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--baseline); }
+  .divlist .row .fill { position: absolute; top: 0; height: 100%; }
+  .divlist .row .fill.pos { left: 50%; background: var(--div-pos); border-radius: 0 4px 4px 0; }
+  .divlist .row .fill.neg { right: 50%; background: var(--div-neg); border-radius: 4px 0 0 4px; }
+  .divlist .row .val { font-size: 12.5px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+
+  svg.chart { width: 100%; height: auto; overflow: visible; display: block; }
+  svg.chart .grid-line { stroke: var(--grid); stroke-width: 1; }
+  svg.chart .baseline { stroke: var(--baseline); stroke-width: 1; }
+  svg.chart .axis-text { fill: var(--text-muted); font-size: 10.5px; }
+  svg.chart .mark-dot { stroke: var(--surface-1); stroke-width: 2; }
+  svg.chart .direct-label { fill: var(--text-secondary); font-size: 11px; font-weight: 650; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 4px; }
+  .legend .key { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100;
+    background: var(--text-primary); color: var(--surface-1);
+    font-size: 12px; line-height: 1.4; padding: 7px 10px; border-radius: 6px;
+    max-width: 240px; opacity: 0; transform: translate(-50%, -100%); transition: opacity .08s;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip b { font-weight: 700; }
+
+  details.table-toggle { margin-top: 14px; }
+  details.table-toggle summary {
+    cursor: pointer; font-size: 12px; color: var(--text-secondary); font-weight: 650;
+    list-style: none;
+  }
+  details.table-toggle summary::-webkit-details-marker { display: none; }
+  details.table-toggle summary::before { content: "\25B8  "; }
+  details.table-toggle[open] summary::before { content: "\25BE  "; }
+
+  table.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  table.data-table th, table.data-table td {
+    padding: 7px 9px; text-align: left; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.data-table th {
+    color: var(--text-muted); font-weight: 650; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .02em; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface-1);
+  }
+  table.data-table th.sort-asc::after { content: " \2191"; }
+  table.data-table th.sort-desc::after { content: " \2193"; }
+  table.data-table td.num, table.data-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data-table tbody tr:hover { background: rgba(128,128,128,.08); }
+
+  .table-scroll { max-height: 560px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .table-scroll table.data-table { margin-top: 0; }
+
+  input.search {
+    width: 100%; max-width: 320px; padding: 8px 10px; margin-bottom: 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); color: var(--text-primary);
+    font: inherit; font-size: 13px;
+  }
+
+  footer.site {
+    padding: 26px 20px 40px; text-align: center; color: var(--text-muted); font-size: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .card-grid { grid-template-columns: 1fr; }
+    .spot-grid { grid-template-columns: 1fr; }
+    .barlist .row, .divlist .row { grid-template-columns: 92px 1fr 50px; }
+    .period-summary { margin-left: 0; width: 100%; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 14px 48px; }
+    header.hero { padding: 24px 14px 20px; }
+    .kpi-row { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    .kpi { padding: 11px 11px 9px; }
+    .kpi .value { font-size: 20px; }
+    .period-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .period-controls { flex-direction: column; }
+    .period-controls label { justify-content: space-between; }
+    .period-controls select, .controls-row select.team-select { width: 100%; }
+    .period-presets { justify-content: flex-start; }
+    section.block { padding: 28px 0 8px; }
+    section.block h2 { font-size: 18px; }
+    .card { padding: 13px 13px 15px; }
+    .barlist .row, .divlist .row { grid-template-columns: 84px 1fr 46px; gap: 6px; }
+    .barlist .row .name { font-size: 12px; }
+    nav.tabs a { padding: 11px 10px; }
+  }
+
+  /* Players page additions */
+  .controls-row { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin-bottom: 18px; }
+  .controls-row label { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+  .controls-row select, .controls-row input {
+    min-height: 34px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 650;
+  }
+  .controls-row select { min-width: 180px; }
+  .backlink { color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 650; }
+  .backlink:hover { color: var(--text-primary); }
+  .pos-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 20px; padding: 0 6px;
+    border-radius: 5px; font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+  .pos-G { background: color-mix(in srgb, var(--series-4) 26%, transparent); color: var(--text-primary); }
+  .pos-D { background: color-mix(in srgb, var(--series-5) 24%, transparent); color: var(--text-primary); }
+  .pos-M { background: color-mix(in srgb, var(--series-1) 20%, transparent); color: var(--text-primary); }
+  .pos-F { background: color-mix(in srgb, var(--series-8) 22%, transparent); color: var(--text-primary); }
+  .formula-note { font-size: 12.5px; color: var(--text-secondary); background: var(--surface-1);
+    border: 1px solid var(--border); border-left: 3px solid var(--series-4); border-radius: 8px; padding: 12px 14px; margin: 0 0 14px; }
+  @media (max-width: 560px) { .controls-row select, .controls-row input { width: 100%; } .controls-row label { width: 100%; justify-content: space-between; } }
+</style>
+</head>
+<body class="viz-root">
+
+  <header class="hero">
+    <div class="wrap">
+      <a class="backlink" href="pl_history_dashboard.html">&larr; History dashboard</a>
+      <h1>Players</h1>
+      <p class="sub" id="hero-sub">Loading&hellip;</p>
+      <p class="note">Per-player Premier League stats. Goals, assists and minutes cover every season from 2010/11; match ratings begin in 2014/15. Use the period, club and position filters to rescope every leaderboard, the impact ranking and the profile lookup below. A few accented names show a replacement character &mdash; that is baked into the source data.</p>
+      <div class="controls-row" id="filters">
+        <label>From season <select id="f-from"></select></label>
+        <label>To season <select id="f-to"></select></label>
+        <label>Club <select id="f-club"></select></label>
+        <label>Position <select id="f-pos"></select></label>
+        <span class="period-summary" id="f-summary"></span>
+      </div>
+      <div class="kpi-row" id="kpi-row"></div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <a href="pl_history_dashboard.html">&larr; History dashboard</a>
+    <a href="pl_team_explorer.html">Team Explorer</a>
+    <a href="#leaderboards">Leaderboards</a>
+    <a href="#impact">Impact index</a>
+    <a href="#profile">Player profile</a>
+  </nav>
+
+  <div class="wrap">
+    <section class="block" id="leaderboards">
+      <h2>Leaderboards</h2>
+      <p class="desc">Top players for the selected period, club and position. Goals and assists are totals; rating and goal-contribution rates are minutes-qualified to keep out small samples.</p>
+      <div class="card-grid">
+        <div class="card"><h3>Top scorers</h3><p class="hint">Goals in the selected range</p><div id="lb-goals"></div></div>
+        <div class="card"><h3>Top assisters</h3><p class="hint">Assists in the selected range</p><div id="lb-assists"></div></div>
+        <div class="card"><h3>Best average rating</h3><p class="hint" id="lb-rating-hint">Minutes-qualified</p><div id="lb-rating"></div></div>
+        <div class="card"><h3>Goal contributions per 90</h3><p class="hint" id="lb-per90-hint">(Goals + assists) per 90 minutes, minutes-qualified</p><div id="lb-per90"></div></div>
+      </div>
+    </section>
+
+    <section class="block" id="impact">
+      <h2>Impact index</h2>
+      <p class="formula-note" id="impact-formula"></p>
+      <div class="card wide">
+        <div class="table-scroll"><table class="data-table" id="impact-table"></table></div>
+      </div>
+    </section>
+
+    <section class="block" id="profile">
+      <h2>Player profile</h2>
+      <p class="desc">Season-by-season record for one player. The list is scoped to players who appear in the current period/club/position filter.</p>
+      <div class="controls-row">
+        <label>Player <select id="p-select"></select></label>
+      </div>
+      <div class="card-grid">
+        <div class="card"><h3 id="p-name">Player</h3><p class="hint" id="p-meta"></p><div class="kpi-row" id="p-kpis" style="margin-top:0"></div></div>
+        <div class="card"><h3>Goals &amp; assists by season</h3><p class="hint">In the selected period</p><div id="p-chart"></div></div>
+      </div>
+      <div class="card wide" style="margin-top:18px">
+        <div class="table-scroll"><table class="data-table" id="p-table"></table></div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="site" id="footer"></footer>
+  <div class="tooltip" id="tooltip"></div>
+
+<script>
+const RAW = __PLAYERS_RAW__;
+</script>
+<script>
+(function () {
+  "use strict";
+  const tooltip = document.getElementById("tooltip");
+  function showTooltip(evt, html) { tooltip.innerHTML = html; tooltip.classList.add("show"); moveTooltip(evt); }
+  function moveTooltip(evt) { tooltip.style.left = evt.clientX + "px"; tooltip.style.top = (evt.clientY - 10) + "px"; }
+  function hideTooltip() { tooltip.classList.remove("show"); }
+  function fmt(n, d) { if (n === null || n === undefined || Number.isNaN(n)) return "-"; return Number(n).toLocaleString(undefined, { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  function svgEl(t, a) { const e = document.createElementNS("http://www.w3.org/2000/svg", t); for (const k in a) e.setAttribute(k, a[k]); return e; }
+  function round(v, d) { const m = Math.pow(10, d || 0); return Math.round((v + Number.EPSILON) * m) / m; }
+
+  const seasonLabel = s => s + "/" + String(s + 1).slice(-2);
+  const teamName = id => RAW.teams[String(id)] || ("#" + id);
+  const POSNAME = { G: "GK", D: "DEF", M: "MID", F: "FWD", "?": "-" };
+  const P = { pid: 0, tid: 1, season: 2, pos: 3, apps: 4, mins: 5, rating: 6, goals: 7, assists: 8, shots: 9, kp: 10, tackles: 11, yellow: 12, red: 13 };
+
+  // ---- horizontal bar list (reused look) ----
+  function hBarList(container, data, opts) {
+    opts = opts || {};
+    const max = Math.max(...data.map(d => Math.abs(d.value)), 1e-9);
+    const wrap = document.createElement("div"); wrap.className = "barlist";
+    if (!data.length) { container.innerHTML = '<p class="hint">No qualifying players for these filters.</p>'; return; }
+    data.forEach(d => {
+      const row = document.createElement("div"); row.className = "row";
+      const w = Math.max(2, Math.round((Math.abs(d.value) / max) * 100));
+      row.innerHTML = `<div class="name" title="${esc(d.label)}">${esc(d.label)}</div>` +
+        `<div class="track"><div class="fill${opts.alt ? " alt" : ""}" style="width:${w}%"></div></div>` +
+        `<div class="val">${esc(opts.fmtValue ? opts.fmtValue(d.value) : fmt(d.value, 0))}</div>`;
+      const track = row.querySelector(".track");
+      track.addEventListener("mousemove", e => showTooltip(e, d.tip || `<b>${esc(d.label)}</b><br>${esc(opts.fmtValue ? opts.fmtValue(d.value) : d.value)}`));
+      track.addEventListener("mouseleave", hideTooltip);
+      wrap.appendChild(row);
+    });
+    container.innerHTML = ""; container.appendChild(wrap);
+  }
+
+  function lineChart(container, categories, series, opts) {
+    opts = opts || {};
+    const W = 640, H = 220, padL = 34, padR = 16, padT = 14, padB = 28;
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    const allVals = series.flatMap(s => s.values.filter(v => v != null));
+    if (!allVals.length) { container.innerHTML = '<p class="hint">No data.</p>'; return; }
+    let minV = 0, maxV = Math.max(...allVals); if (maxV === minV) maxV = minV + 1; maxV *= 1.15;
+    const n = categories.length;
+    const x = i => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+    const y = v => padT + innerH - ((v - minV) / (maxV - minV)) * innerH;
+    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}` });
+    for (let t = 0; t <= 4; t++) { const v = minV + (maxV - minV) * t / 4, yy = y(v); svg.appendChild(svgEl("line", { class: "grid-line", x1: padL, x2: W - padR, y1: yy, y2: yy })); const tx = svgEl("text", { class: "axis-text", x: padL - 6, y: yy + 3, "text-anchor": "end" }); tx.textContent = fmt(v, 0); svg.appendChild(tx); }
+    const step = Math.max(1, Math.round(n / 8));
+    categories.forEach((c, i) => { if (i % step !== 0 && i !== n - 1) return; const tx = svgEl("text", { class: "axis-text", x: x(i), y: H - 6, "text-anchor": "middle" }); tx.textContent = c; svg.appendChild(tx); });
+    series.forEach(s => {
+      const pts = s.values.map((v, i) => [x(i), v == null ? null : y(v), v, i]).filter(p => p[1] != null);
+      const d = pts.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+      svg.appendChild(svgEl("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      pts.forEach(([px, py, v, i]) => { const dot = svgEl("circle", { class: "mark-dot", cx: px, cy: py, r: 4, fill: s.color }); dot.addEventListener("mousemove", e => showTooltip(e, `<b>${esc(categories[i])}</b><br>${esc(s.name)}: ${fmt(v, 0)}`)); dot.addEventListener("mouseleave", hideTooltip); svg.appendChild(dot); });
+    });
+    container.innerHTML = "";
+    if (series.length > 1) { const lg = document.createElement("div"); lg.className = "legend"; lg.innerHTML = series.map(s => `<span class="key"><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}</span>`).join(""); container.appendChild(lg); }
+    container.appendChild(svg);
+  }
+
+  function renderTable(tableEl, columns, rows, opts) {
+    opts = opts || {};
+    let sortKey = opts.defaultSort || columns[0].key, sortDir = opts.defaultDir || "desc";
+    function draw() {
+      const sorted = [...rows].sort((a, b) => { const av = a[sortKey], bv = b[sortKey]; let c = typeof av === "string" ? av.localeCompare(bv) : (av == null ? -Infinity : av) - (bv == null ? -Infinity : bv); return sortDir === "asc" ? c : -c; });
+      tableEl.innerHTML = `<thead><tr>${columns.map(c => `<th data-key="${c.key}" class="${c.num ? "num" : ""} ${sortKey === c.key ? (sortDir === "asc" ? "sort-asc" : "sort-desc") : ""}">${esc(c.label)}</th>`).join("")}</tr></thead>` +
+        `<tbody>${sorted.map(r => `<tr>${columns.map(c => `<td class="${c.num ? "num" : ""}">${c.fmt ? c.fmt(r[c.key], r) : esc(r[c.key])}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      tableEl.querySelectorAll("th").forEach(th => th.addEventListener("click", () => { const k = th.getAttribute("data-key"); if (sortKey === k) sortDir = sortDir === "asc" ? "desc" : "asc"; else { sortKey = k; sortDir = k === "season" || k === "player" ? "asc" : "desc"; } draw(); }));
+    }
+    draw();
+  }
+
+  function posBadge(pos) { return `<span class="pos-badge pos-${pos}">${POSNAME[pos] || "-"}</span>`; }
+
+  // ================= engine =================
+  const SEASONS = RAW.seasons.slice();
+  const MIN_S = SEASONS[0], MAX_S = SEASONS[SEASONS.length - 1];
+
+  function compute(fromS, toS, club, pos) {
+    const rows = RAW.pss.filter(r => r[P.season] >= fromS && r[P.season] <= toS && (club === "all" || r[P.tid] === +club));
+    const agg = new Map();
+    rows.forEach(r => {
+      const id = r[P.pid];
+      if (!agg.has(id)) agg.set(id, { pid: id, mins: 0, apps: 0, goals: 0, assists: 0, shots: 0, kp: 0, tackles: 0, yellow: 0, red: 0, rNum: 0, rDen: 0, teamMins: new Map(), posMins: new Map(), lastSeason: -1, rows: [] });
+      const a = agg.get(id);
+      a.mins += r[P.mins]; a.apps += r[P.apps]; a.goals += r[P.goals]; a.assists += r[P.assists];
+      a.shots += r[P.shots]; a.kp += r[P.kp]; a.tackles += r[P.tackles]; a.yellow += r[P.yellow]; a.red += r[P.red];
+      if (r[P.rating] != null && r[P.mins] > 0) { a.rNum += r[P.rating] * r[P.mins]; a.rDen += r[P.mins]; }
+      a.teamMins.set(r[P.tid], (a.teamMins.get(r[P.tid]) || 0) + r[P.mins]);
+      a.posMins.set(r[P.pos], (a.posMins.get(r[P.pos]) || 0) + r[P.mins]);
+      if (r[P.season] > a.lastSeason) a.lastSeason = r[P.season];
+      a.rows.push(r);
+    });
+    const nSeasons = SEASONS.filter(s => s >= fromS && s <= toS).length;
+    const minFloor = Math.round(900 * Math.sqrt(nSeasons));
+    let out = [];
+    agg.forEach(a => {
+      const primaryPos = [...a.posMins.entries()].sort((x, y) => y[1] - x[1])[0][0];
+      if (pos !== "all" && primaryPos !== pos) return;
+      const primaryTeam = [...a.teamMins.entries()].sort((x, y) => y[1] - x[1])[0][0];
+      const rating = a.rDen ? round(a.rNum / a.rDen, 2) : null;
+      const ga = a.goals + a.assists;
+      const per90 = a.mins ? round(ga / (a.mins / 90), 2) : 0;
+      const nClubs = a.teamMins.size;
+      const pinfo = RAW.players[String(a.pid)] || ["#" + a.pid, ""];
+      const impact = (rating != null && a.mins >= minFloor) ? round(per90 * (rating / 7), 3) : null;
+      out.push({
+        pid: a.pid, name: pinfo[0], nat: pinfo[1], pos: primaryPos, club: teamName(primaryTeam), nClubs,
+        mins: a.mins, apps: a.apps, goals: a.goals, assists: a.assists, ga, per90, rating,
+        shots: a.shots, kp: a.kp, tackles: a.tackles, yellow: a.yellow, red: a.red,
+        impact, qualified: a.mins >= minFloor, rows: a.rows,
+      });
+    });
+    return { players: out, minFloor, nSeasons, fromS, toS, club, pos };
+  }
+
+  // ================= render =================
+  let STATE = null;
+  const el = id => document.getElementById(id);
+
+  function renderAll() {
+    const d = STATE, players = d.players;
+    el("hero-sub").textContent = `${RAW.league} • ${seasonLabel(d.fromS)}–${seasonLabel(d.toS)} • ${players.length.toLocaleString()} players` +
+      (d.club === "all" ? "" : " • " + teamName(+d.club)) + (d.pos === "all" ? "" : " • " + POSNAME[d.pos]);
+
+    const topScorer = [...players].sort((a, b) => b.goals - a.goals)[0];
+    const topAssist = [...players].sort((a, b) => b.assists - a.assists)[0];
+    const topRated = [...players].filter(p => p.qualified && p.rating != null).sort((a, b) => b.rating - a.rating)[0];
+    el("kpi-row").innerHTML = [
+      { label: "Players in view", value: players.length.toLocaleString() },
+      { label: "Top scorer", value: topScorer ? `${topScorer.name}` : "-", sub: topScorer ? topScorer.goals + " goals" : "" },
+      { label: "Most assists", value: topAssist ? topAssist.name : "-", sub: topAssist ? topAssist.assists + " assists" : "" },
+      { label: "Best rated", value: topRated ? topRated.name : "-", sub: topRated ? fmt(topRated.rating, 2) : "" },
+      { label: "Seasons", value: d.nSeasons },
+      { label: "Minutes floor", value: d.minFloor.toLocaleString() },
+    ].map(k => `<div class="kpi"><p class="label">${esc(k.label)}</p><p class="value">${esc(k.value)}${k.sub ? ` <small>${esc(k.sub)}</small>` : ""}</p></div>`).join("");
+
+    const mkTip = p => `<b>${esc(p.name)}</b> · ${esc(p.club)}${p.nClubs > 1 ? " +" + (p.nClubs - 1) : ""}<br>${p.goals}G ${p.assists}A · ${fmt(p.mins, 0)} mins${p.rating != null ? " · " + fmt(p.rating, 2) + "★" : ""}`;
+    const lbl = p => `${p.name}`;
+    hBarList(el("lb-goals"), [...players].sort((a, b) => b.goals - a.goals).slice(0, 12).map(p => ({ label: lbl(p), value: p.goals, tip: mkTip(p) })), { fmtValue: v => fmt(v, 0) });
+    hBarList(el("lb-assists"), [...players].sort((a, b) => b.assists - a.assists).slice(0, 12).map(p => ({ label: lbl(p), value: p.assists, tip: mkTip(p) })), { fmtValue: v => fmt(v, 0), alt: true });
+    hBarList(el("lb-rating"), [...players].filter(p => p.qualified && p.rating != null).sort((a, b) => b.rating - a.rating).slice(0, 12).map(p => ({ label: lbl(p), value: p.rating, tip: mkTip(p) })), { fmtValue: v => fmt(v, 2) });
+    hBarList(el("lb-per90"), [...players].filter(p => p.qualified).sort((a, b) => b.per90 - a.per90).slice(0, 12).map(p => ({ label: lbl(p), value: p.per90, tip: mkTip(p) })), { fmtValue: v => fmt(v, 2), alt: true });
+    el("lb-rating-hint").textContent = `Minutes-qualified (≥ ${d.minFloor.toLocaleString()} mins), rating from 2014/15`;
+    el("lb-per90-hint").textContent = `(Goals + assists) per 90, ≥ ${d.minFloor.toLocaleString()} mins`;
+
+    el("impact-formula").innerHTML = `<b>Impact index = goal contributions per 90 &times; (rating &divide; 7)</b>, for players with at least ${d.minFloor.toLocaleString()} minutes and a rating on record. It rewards players who both create/score and are rated highly; it naturally favours attacking roles, so the rating and per-90 columns are shown alongside for context.`;
+    renderTable(el("impact-table"), [
+      { key: "name", label: "Player" },
+      { key: "pos", label: "Pos", fmt: v => posBadge(v) },
+      { key: "club", label: "Club", fmt: (v, r) => esc(v) + (r.nClubs > 1 ? ` <span class="hint">+${r.nClubs - 1}</span>` : "") },
+      { key: "mins", label: "Mins", num: true, fmt: v => fmt(v, 0) },
+      { key: "goals", label: "G", num: true },
+      { key: "assists", label: "A", num: true },
+      { key: "per90", label: "G+A/90", num: true, fmt: v => fmt(v, 2) },
+      { key: "rating", label: "Rating", num: true, fmt: v => v == null ? "-" : fmt(v, 2) },
+      { key: "impact", label: "Impact", num: true, fmt: v => v == null ? "-" : fmt(v, 3) },
+    ], players.filter(p => p.impact != null).sort((a, b) => b.impact - a.impact).slice(0, 25), { defaultSort: "impact", defaultDir: "desc" });
+
+    // profile select scoped to current filter, sorted by name
+    const sorted = [...players].sort((a, b) => a.name.localeCompare(b.name));
+    const sel = el("p-select");
+    const prev = sel.value;
+    sel.innerHTML = sorted.map(p => `<option value="${p.pid}">${esc(p.name)} — ${esc(p.club)}</option>`).join("");
+    const defaultPid = (topScorer && sorted.some(p => p.pid === topScorer.pid)) ? topScorer.pid : (sorted[0] && sorted[0].pid);
+    sel.value = (prev && sorted.some(p => String(p.pid) === prev)) ? prev : String(defaultPid);
+    renderProfile(sel.value);
+
+    el("f-summary").textContent = `${seasonLabel(d.fromS)}–${seasonLabel(d.toS)} · ${d.nSeasons} season${d.nSeasons === 1 ? "" : "s"}`;
+    el("footer").textContent = `Generated ${new Date(RAW.generated_at).toLocaleString()} from acca-bot's local Premier League dataset. Regenerate with scripts/build_history_dashboard.py.`;
+  }
+
+  function renderProfile(pid) {
+    const p = STATE.players.find(x => String(x.pid) === String(pid));
+    if (!p) { el("p-name").textContent = "No player"; el("p-table").innerHTML = ""; el("p-chart").innerHTML = ""; el("p-kpis").innerHTML = ""; el("p-meta").textContent = ""; return; }
+    el("p-name").textContent = p.name;
+    el("p-meta").innerHTML = `${posBadge(p.pos)} ${esc(p.nat || "")} · ${p.nClubs} club${p.nClubs === 1 ? "" : "s"} in range`;
+    el("p-kpis").innerHTML = [
+      { label: "Goals", value: p.goals }, { label: "Assists", value: p.assists },
+      { label: "Minutes", value: fmt(p.mins, 0) }, { label: "Avg rating", value: p.rating == null ? "-" : fmt(p.rating, 2) },
+    ].map(k => `<div class="kpi"><p class="label">${esc(k.label)}</p><p class="value">${esc(k.value)}</p></div>`).join("");
+
+    const bySeason = new Map();
+    p.rows.forEach(r => {
+      const s = r[P.season];
+      if (!bySeason.has(s)) bySeason.set(s, { season: s, tid: r[P.tid], apps: 0, mins: 0, goals: 0, assists: 0, rNum: 0, rDen: 0, pos: r[P.pos] });
+      const a = bySeason.get(s); a.apps += r[P.apps]; a.mins += r[P.mins]; a.goals += r[P.goals]; a.assists += r[P.assists];
+      if (r[P.rating] != null && r[P.mins] > 0) { a.rNum += r[P.rating] * r[P.mins]; a.rDen += r[P.mins]; }
+    });
+    const recs = [...bySeason.values()].sort((a, b) => a.season - b.season).map(a => ({
+      season: seasonLabel(a.season), club: teamName(a.tid), pos: a.pos, apps: a.apps, mins: a.mins,
+      goals: a.goals, assists: a.assists, rating: a.rDen ? round(a.rNum / a.rDen, 2) : null,
+    }));
+    lineChart(el("p-chart"), recs.map(r => r.season), [
+      { name: "Goals", color: "var(--series-1)", values: recs.map(r => r.goals) },
+      { name: "Assists", color: "var(--series-6)", values: recs.map(r => r.assists) },
+    ]);
+    renderTable(el("p-table"), [
+      { key: "season", label: "Season" }, { key: "club", label: "Club" },
+      { key: "pos", label: "Pos", fmt: v => posBadge(v) },
+      { key: "apps", label: "Apps", num: true }, { key: "mins", label: "Mins", num: true, fmt: v => fmt(v, 0) },
+      { key: "goals", label: "G", num: true }, { key: "assists", label: "A", num: true },
+      { key: "rating", label: "Rating", num: true, fmt: v => v == null ? "-" : fmt(v, 2) },
+    ], recs, { defaultSort: "season", defaultDir: "asc" });
+  }
+
+  // ================= controls =================
+  let fromS = MIN_S, toS = MAX_S, club = "all", pos = "all";
+  const fromSel = el("f-from"), toSel = el("f-to"), clubSel = el("f-club"), posSel = el("f-pos");
+  const seasonOpts = SEASONS.map(s => `<option value="${s}">${seasonLabel(s)}</option>`).join("");
+  fromSel.innerHTML = seasonOpts; toSel.innerHTML = seasonOpts;
+  fromSel.value = String(fromS); toSel.value = String(toS);
+  const clubList = Object.keys(RAW.teams).map(id => ({ id, name: RAW.teams[id] })).sort((a, b) => a.name.localeCompare(b.name));
+  clubSel.innerHTML = `<option value="all">All clubs</option>` + clubList.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  posSel.innerHTML = `<option value="all">All positions</option><option value="G">Goalkeepers</option><option value="D">Defenders</option><option value="M">Midfielders</option><option value="F">Forwards</option>`;
+
+  function refresh() {
+    if (fromS > toS) { const t = fromS; fromS = toS; toS = t; fromSel.value = String(fromS); toSel.value = String(toS); }
+    STATE = compute(fromS, toS, club, pos);
+    renderAll();
+  }
+  fromSel.addEventListener("change", () => { fromS = +fromSel.value; refresh(); });
+  toSel.addEventListener("change", () => { toS = +toSel.value; refresh(); });
+  clubSel.addEventListener("change", () => { club = clubSel.value; refresh(); });
+  posSel.addEventListener("change", () => { pos = posSel.value; refresh(); });
+  el("p-select").addEventListener("change", e => renderProfile(e.target.value));
+  document.addEventListener("mousemove", e => { if (tooltip.classList.contains("show")) moveTooltip(e); });
+  refresh();
+})();
+</script>
+
+</body>
+</html>

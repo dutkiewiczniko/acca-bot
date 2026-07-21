@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Premier League Data Explorer</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good-text:      #006300;
+
+    --series-1: #2a78d6; /* blue   */
+    --series-2: #008300; /* green  */
+    --series-3: #e87ba4; /* magenta*/
+    --series-4: #eda100; /* yellow */
+    --series-5: #1baf7a; /* aqua   */
+    --series-6: #eb6834; /* orange */
+    --series-7: #4a3aa7; /* violet */
+    --series-8: #e34948; /* red    */
+
+    --seq-100: #cde2fb; --seq-150: #b7d3f6; --seq-200: #9ec5f4; --seq-250: #86b6ef;
+    --seq-300: #6da7ec; --seq-350: #5598e7; --seq-400: #3987e5; --seq-450: #2a78d6;
+    --seq-500: #256abf; --seq-550: #1c5cab; --seq-600: #184f95; --seq-650: #104281;
+    --seq-700: #0d366b;
+
+    --div-pos: #2a78d6;  /* blue */
+    --div-neg: #e34948;  /* red */
+    --div-mid: #f0efec;
+
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --good-text:      #0ca30c;
+
+      --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+      --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+
+      --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --good-text:      #0ca30c;
+
+    --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+    --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+
+    --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body.viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 64px; }
+
+  header.hero {
+    padding: 40px 20px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-1);
+  }
+  header.hero .wrap { padding-bottom: 0; }
+  header.hero h1 { margin: 0 0 6px; font-size: clamp(24px, 4vw, 34px); font-weight: 750; }
+  header.hero p.sub { margin: 0; color: var(--text-secondary); font-size: 15px; max-width: 70ch; }
+  header.hero p.note { margin: 10px 0 0; color: var(--text-muted); font-size: 13px; max-width: 70ch; }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0,1fr));
+    gap: 12px;
+    margin-top: 26px;
+  }
+  .kpi {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 14px 12px;
+    min-width: 0;
+  }
+  .kpi .label { color: var(--text-secondary); font-size: 12px; margin: 0 0 6px; }
+  .kpi .value { font-size: 24px; font-weight: 700; margin: 0; }
+  .kpi .value small { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+
+  nav.tabs {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; gap: 2px; overflow-x: auto;
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+  }
+  nav.tabs a {
+    display: inline-block; padding: 12px 14px; font-size: 13px; font-weight: 650;
+    color: var(--text-secondary); text-decoration: none; white-space: nowrap;
+    border-bottom: 2px solid transparent;
+  }
+  nav.tabs a:hover { color: var(--text-primary); border-bottom-color: var(--baseline); }
+
+  section.block { padding: 40px 0 8px; border-bottom: 1px solid var(--border); }
+  section.block:last-of-type { border-bottom: none; }
+  section.block h2 { font-size: 20px; margin: 0 0 4px; scroll-margin-top: 56px; }
+  section.block p.desc { color: var(--text-secondary); margin: 0 0 20px; max-width: 78ch; font-size: 13.5px; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 18px; min-width: 0;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  .card h3 { font-size: 14px; margin: 0 0 2px; }
+  .card p.hint { margin: 0 0 14px; color: var(--text-muted); font-size: 12px; }
+
+  .spot-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+  .spot {
+    background: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--series-1);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .spot h3 { margin: 0 0 6px; font-size: 14px; }
+  .spot p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+
+  /* bar chart (HTML/CSS based) */
+  .barlist { display: flex; flex-direction: column; gap: 6px; }
+  .barlist .row { display: grid; grid-template-columns: 128px 1fr 56px; align-items: center; gap: 8px; }
+  .barlist .row .name { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barlist .row .track { position: relative; height: 16px; background: var(--grid); border-radius: 4px; overflow: hidden; }
+  .barlist .row .fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .barlist .row .fill.alt { background: var(--series-5); }
+  .barlist .row .val { font-size: 12.5px; color: var(--text-primary); font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+  .barlist .row.highlight .name, .barlist .row.highlight .val { color: var(--text-primary); font-weight: 750; }
+
+  /* diverging bar */
+  .divlist .row { display: grid; grid-template-columns: 128px 1fr 64px; align-items: center; gap: 8px; }
+  .divlist .row .name { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .divlist .row .track { position: relative; height: 16px; background: var(--div-mid); border-radius: 4px; overflow: hidden; }
+  .divlist .row .track::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--baseline); }
+  .divlist .row .fill { position: absolute; top: 0; height: 100%; }
+  .divlist .row .fill.pos { left: 50%; background: var(--div-pos); border-radius: 0 4px 4px 0; }
+  .divlist .row .fill.neg { right: 50%; background: var(--div-neg); border-radius: 4px 0 0 4px; }
+  .divlist .row .val { font-size: 12.5px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+
+  svg.chart { width: 100%; height: auto; overflow: visible; display: block; }
+  svg.chart .grid-line { stroke: var(--grid); stroke-width: 1; }
+  svg.chart .baseline { stroke: var(--baseline); stroke-width: 1; }
+  svg.chart .axis-text { fill: var(--text-muted); font-size: 10.5px; }
+  svg.chart .mark-dot { stroke: var(--surface-1); stroke-width: 2; }
+  svg.chart .direct-label { fill: var(--text-secondary); font-size: 11px; font-weight: 650; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 4px; }
+  .legend .key { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100;
+    background: var(--text-primary); color: var(--surface-1);
+    font-size: 12px; line-height: 1.4; padding: 7px 10px; border-radius: 6px;
+    max-width: 240px; opacity: 0; transform: translate(-50%, -100%); transition: opacity .08s;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip b { font-weight: 700; }
+
+  details.table-toggle { margin-top: 14px; }
+  details.table-toggle summary {
+    cursor: pointer; font-size: 12px; color: var(--text-secondary); font-weight: 650;
+    list-style: none;
+  }
+  details.table-toggle summary::-webkit-details-marker { display: none; }
+  details.table-toggle summary::before { content: "\25B8  "; }
+  details.table-toggle[open] summary::before { content: "\25BE  "; }
+
+  table.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  table.data-table th, table.data-table td {
+    padding: 7px 9px; text-align: left; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.data-table th {
+    color: var(--text-muted); font-weight: 650; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .02em; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface-1);
+  }
+  table.data-table th.sort-asc::after { content: " \2191"; }
+  table.data-table th.sort-desc::after { content: " \2193"; }
+  table.data-table td.num, table.data-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data-table tbody tr:hover { background: rgba(128,128,128,.08); }
+
+  .table-scroll { max-height: 560px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .table-scroll table.data-table { margin-top: 0; }
+
+  input.search {
+    width: 100%; max-width: 320px; padding: 8px 10px; margin-bottom: 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); color: var(--text-primary);
+    font: inherit; font-size: 13px;
+  }
+
+  footer.site {
+    padding: 26px 20px 40px; text-align: center; color: var(--text-muted); font-size: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .card-grid { grid-template-columns: 1fr; }
+    .spot-grid { grid-template-columns: 1fr; }
+    .barlist .row, .divlist .row { grid-template-columns: 92px 1fr 50px; }
+  }
+</style>
+</head>
+<body class="viz-root">
+<header class="hero">
+  <div class="wrap">
+    <h1>Premier League Data Explorer</h1>
+    <p class="sub" id="hero-sub">Loading&hellip;</p>
+    <p class="note">Built from match-by-match results, team stats and computed fixture-importance scores gathered by acca-bot. All figures are team/match level -- the underlying data source has no individual player statistics, so "ones to watch" below are teams, identified from form, points trajectories and expected-goals over/under-performance rather than player ratings.</p>
+    <div class="kpi-row" id="kpi-row"></div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <a href="#spotlights">Spotlights</a>
+  <a href="#season-trends">Season trends</a>
+  <a href="#all-time">All-time table</a>
+  <a href="#leaderboards">Leaderboards</a>
+  <a href="#style">Playing style</a>
+  <a href="#xg">xG performance</a>
+  <a href="#efficiency">Shot efficiency</a>
+  <a href="#discipline">Discipline</a>
+  <a href="#importance">Big matches</a>
+  <a href="#promising">Teams to watch</a>
+</nav>
+
+<div class="wrap">
+
+<section class="block" id="spotlights">
+  <h2>Spotlights</h2>
+  <p class="desc">Auto-generated from the numbers below -- a quick read on what stands out across every season in the dataset.</p>
+  <div class="spot-grid" id="spot-grid"></div>
+</section>
+
+<section class="block" id="season-trends">
+  <h2>Season trends</h2>
+  <p class="desc">How the league itself has changed season to season: scoring rate, the home/draw/away split, and (where match-stats exist, 2014/15 onward) cards and expected goals.</p>
+  <div class="card-grid">
+    <div class="card">
+      <h3>Goals per game</h3>
+      <p class="hint">Average total goals in a match, by season</p>
+      <div id="chart-goals"></div>
+    </div>
+    <div class="card">
+      <h3>Match outcome share</h3>
+      <p class="hint">Home win / draw / away win, as a share of matches each season</p>
+      <div id="chart-outcomes"></div>
+    </div>
+    <div class="card">
+      <h3>Cards per team per game</h3>
+      <p class="hint">Yellow + red cards shown, averaged per team per match (data from 2014/15)</p>
+      <div id="chart-cards"></div>
+    </div>
+    <div class="card">
+      <h3>Expected goals (xG) per team per game</h3>
+      <p class="hint">Average team xG per match (data from 2022/23, when xG capture began)</p>
+      <div id="chart-xg-season"></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="all-time">
+  <h2>All-time team table</h2>
+  <p class="desc">Every team's combined record across all seasons in the dataset -- search, or click a column to sort.</p>
+  <input class="search" id="team-search" type="search" placeholder="Search teams&hellip;">
+  <div class="table-scroll"><table class="data-table" id="team-table"></table></div>
+</section>
+
+<section class="block" id="leaderboards">
+  <h2>Leaderboards</h2>
+  <p class="desc">Top 12 by points, goals scored, points-per-game and league titles, combined across every season played.</p>
+  <div class="card-grid">
+    <div class="card"><h3>Most points, all-time</h3><p class="hint">Total league points earned</p><div id="chart-points"></div></div>
+    <div class="card"><h3>Most goals scored, all-time</h3><p class="hint">Total goals scored across all matches</p><div id="chart-goals-total"></div></div>
+    <div class="card"><h3>Best points-per-game</h3><p class="hint">Minimum 3 seasons in the dataset</p><div id="chart-ppg"></div></div>
+    <div class="card"><h3>Most titles</h3><p class="hint">Finished 1st at season end</p><div id="chart-titles"></div></div>
+  </div>
+</section>
+
+<section class="block" id="style">
+  <h2>Playing style</h2>
+  <p class="desc">Averaged from every match with recorded stats (2014/15 onward), teams with at least 20 sampled matches.</p>
+  <div class="card-grid">
+    <div class="card"><h3>Possession leaders</h3><p class="hint">Average possession %</p><div id="chart-possession"></div></div>
+    <div class="card"><h3>Shot volume leaders</h3><p class="hint">Average shots per game</p><div id="chart-shots"></div></div>
+    <div class="card"><h3>Pass accuracy leaders</h3><p class="hint">Completed passes as % of attempted</p><div id="chart-passacc"></div></div>
+    <div class="card"><h3>Corners per game</h3><p class="hint">Average corners won per match</p><div id="chart-corners"></div></div>
+  </div>
+</section>
+
+<section class="block" id="xg">
+  <h2>Expected goals: over- and under-performance</h2>
+  <p class="desc">Goals actually scored minus expected goals (xG), per game, since 2022/23 (when xG capture began). Positive = more clinical than the underlying chances suggest; negative = created the chances but didn't convert them -- a common signal for regression toward the mean next season.</p>
+  <div class="card wide">
+    <div id="chart-xgdiff"></div>
+  </div>
+</section>
+
+<section class="block" id="efficiency">
+  <h2>Shot efficiency</h2>
+  <p class="desc">Shot volume vs. conversion rate -- teams in the upper-right create <em>and</em> finish chances; upper-left create a lot but waste them; lower-right shoot rarely but clinically.</p>
+  <div class="card wide">
+    <div id="chart-scatter"></div>
+  </div>
+</section>
+
+<section class="block" id="discipline">
+  <h2>Discipline</h2>
+  <p class="desc">Cards per game (yellow + 2&times; red, to weight sendings-off), teams with at least 20 sampled matches.</p>
+  <div class="card-grid">
+    <div class="card"><h3>Most cards per game</h3><p class="hint">Top 10</p><div id="chart-cards-worst"></div></div>
+    <div class="card"><h3>Fewest cards per game</h3><p class="hint">Top 10</p><div id="chart-cards-best"></div></div>
+  </div>
+</section>
+
+<section class="block" id="importance">
+  <h2>Biggest matches</h2>
+  <p class="desc">Fixture "importance" is a computed score blending title race, European-qualification and relegation stakes at kickoff (plus a derby flag). Higher = more was riding on the result.</p>
+  <div class="card-grid">
+    <div class="card wide">
+      <h3>Highest-stakes matches in the dataset</h3>
+      <div class="table-scroll"><table class="data-table" id="importance-table"></table></div>
+    </div>
+    <div class="card wide">
+      <h3>Most-played derby fixtures</h3>
+      <p class="hint">By number of meetings flagged as a derby</p>
+      <div class="table-scroll"><table class="data-table" id="derby-table"></table></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="promising">
+  <h2>Teams to watch</h2>
+  <p class="desc">Points earned in the most recent season vs. two seasons earlier, for every team that played both -- the clearest read on which sides are genuinely trending, independent of a single lucky or unlucky season.</p>
+  <div class="card wide">
+    <div id="chart-promising"></div>
+  </div>
+</section>
+
+</div>
+
+<footer class="site" id="footer"></footer>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = __DASHBOARD_DATA__;
+</script>
+<script>
+(function () {
+  "use strict";
+
+  const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
+  const tooltip = document.getElementById("tooltip");
+
+  function showTooltip(evt, html) {
+    tooltip.innerHTML = html;
+    tooltip.classList.add("show");
+    moveTooltip(evt);
+  }
+  function moveTooltip(evt) {
+    const x = evt.clientX, y = evt.clientY;
+    tooltip.style.left = x + "px";
+    tooltip.style.top = (y - 10) + "px";
+  }
+  function hideTooltip() { tooltip.classList.remove("show"); }
+
+  function fmt(n, digits) {
+    if (n === null || n === undefined || Number.isNaN(n)) return "-";
+    if (digits === undefined) digits = 0;
+    return Number(n).toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  }
+  function pct(n, digits) {
+    if (n === null || n === undefined) return "-";
+    return (n * 100).toFixed(digits === undefined ? 1 : digits) + "%";
+  }
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+  // ---------- horizontal bar list (sequential, single hue) ----------
+  function hBarList(container, data, opts) {
+    opts = opts || {};
+    const valueKey = opts.valueKey, labelKey = opts.labelKey || "team";
+    const fmtValue = opts.fmtValue || (v => fmt(v, 1));
+    const max = Math.max(...data.map(d => Math.abs(d[valueKey])), 1e-9);
+    const wrap = document.createElement("div");
+    wrap.className = "barlist";
+    data.forEach((d) => {
+      const row = document.createElement("div");
+      row.className = "row" + (opts.highlight && opts.highlight(d) ? " highlight" : "");
+      const pctW = Math.max(2, Math.round((Math.abs(d[valueKey]) / max) * 100));
+      row.innerHTML = `
+        <div class="name" title="${esc(d[labelKey])}">${esc(d[labelKey])}</div>
+        <div class="track"><div class="fill${opts.alt ? ' alt' : ''}" style="width:${pctW}%"></div></div>
+        <div class="val">${esc(fmtValue(d[valueKey]))}</div>`;
+      const track = row.querySelector(".track");
+      track.addEventListener("mousemove", (e) => showTooltip(e, opts.tooltip ? opts.tooltip(d) : `<b>${esc(d[labelKey])}</b><br>${esc(fmtValue(d[valueKey]))}`));
+      track.addEventListener("mouseleave", hideTooltip);
+      wrap.appendChild(row);
+    });
+    container.innerHTML = "";
+    container.appendChild(wrap);
+  }
+
+  // ---------- diverging bar list ----------
+  function divBarList(container, data, opts) {
+    opts = opts || {};
+    const valueKey = opts.valueKey, labelKey = opts.labelKey || "team";
+    const fmtValue = opts.fmtValue || (v => (v > 0 ? "+" : "") + fmt(v, 2));
+    const max = Math.max(...data.map(d => Math.abs(d[valueKey])), 1e-9);
+    const wrap = document.createElement("div");
+    wrap.className = "divlist barlist";
+    data.forEach((d) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      const v = d[valueKey];
+      const pctW = Math.max(1, Math.round((Math.abs(v) / max) * 50));
+      const cls = v >= 0 ? "pos" : "neg";
+      const style = v >= 0 ? `width:${pctW}%` : `width:${pctW}%`;
+      row.innerHTML = `
+        <div class="name" title="${esc(d[labelKey])}">${esc(d[labelKey])}</div>
+        <div class="track"><div class="fill ${cls}" style="${style}"></div></div>
+        <div class="val" style="color:${v >= 0 ? 'var(--good-text)' : 'var(--div-neg)'}">${esc(fmtValue(v))}</div>`;
+      const track = row.querySelector(".track");
+      track.addEventListener("mousemove", (e) => showTooltip(e, opts.tooltip ? opts.tooltip(d) : `<b>${esc(d[labelKey])}</b><br>${esc(fmtValue(v))}`));
+      track.addEventListener("mouseleave", hideTooltip);
+      wrap.appendChild(row);
+    });
+    container.innerHTML = "";
+    container.appendChild(wrap);
+  }
+
+  // ---------- line chart (single or multi series) ----------
+  function lineChart(container, categories, series, opts) {
+    opts = opts || {};
+    const W = 640, H = 240, padL = 40, padR = 16, padT = 16, padB = 28;
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    const allVals = series.flatMap(s => s.values.filter(v => v !== null && v !== undefined));
+    let minV = opts.min !== undefined ? opts.min : Math.min(0, ...allVals);
+    let maxV = opts.max !== undefined ? opts.max : Math.max(...allVals);
+    if (maxV === minV) maxV = minV + 1;
+    const pad = (maxV - minV) * 0.1;
+    maxV += pad;
+    const n = categories.length;
+    const x = i => padL + (n <= 1 ? 0 : (i / (n - 1)) * innerW);
+    const y = v => padT + innerH - ((v - minV) / (maxV - minV)) * innerH;
+
+    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, role: "img" });
+
+    const ticks = 4;
+    for (let t = 0; t <= ticks; t++) {
+      const v = minV + ((maxV - minV) * t) / ticks;
+      const yy = y(v);
+      svg.appendChild(svgEl("line", { class: "grid-line", x1: padL, x2: W - padR, y1: yy, y2: yy }));
+      const txt = svgEl("text", { class: "axis-text", x: 4, y: yy + 3 });
+      txt.textContent = opts.yFmt ? opts.yFmt(v) : fmt(v, 1);
+      svg.appendChild(txt);
+    }
+    const step = Math.max(1, Math.round(n / 8));
+    categories.forEach((c, i) => {
+      if (i % step !== 0 && i !== n - 1) return;
+      const txt = svgEl("text", { class: "axis-text", x: x(i), y: H - 6, "text-anchor": "middle" });
+      txt.textContent = c;
+      svg.appendChild(txt);
+    });
+    svg.appendChild(svgEl("line", { class: "baseline", x1: padL, x2: W - padR, y1: padT + innerH, y2: padT + innerH }));
+
+    series.forEach((s) => {
+      const pts = s.values.map((v, i) => [x(i), v === null || v === undefined ? null : y(v)]).filter(p => p[1] !== null);
+      const d = pts.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+      svg.appendChild(svgEl("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      pts.forEach(([px, py], i) => {
+        const dot = svgEl("circle", { class: "mark-dot", cx: px, cy: py, r: 4, fill: s.color });
+        dot.addEventListener("mousemove", (e) => showTooltip(e, `<b>${esc(categories[i])}</b><br>${esc(s.name)}: ${esc(opts.tipFmt ? opts.tipFmt(s.values[i]) : fmt(s.values[i], 2))}`));
+        dot.addEventListener("mouseleave", hideTooltip);
+        svg.appendChild(dot);
+      });
+      if (opts.endLabel) {
+        const last = pts[pts.length - 1];
+        if (last) {
+          const txt = svgEl("text", { class: "direct-label", x: last[0] - 4, y: last[1] - 8, "text-anchor": "end" });
+          txt.textContent = opts.tipFmt ? opts.tipFmt(s.values[s.values.length - 1]) : fmt(s.values[s.values.length - 1], 2);
+          svg.appendChild(txt);
+        }
+      }
+    });
+
+    container.innerHTML = "";
+    if (series.length > 1) {
+      const legend = document.createElement("div");
+      legend.className = "legend";
+      legend.innerHTML = series.map(s => `<span class="key"><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}</span>`).join("");
+      container.appendChild(legend);
+    }
+    container.appendChild(svg);
+  }
+
+  // ---------- 100% stacked column chart ----------
+  function stackedColumnChart(container, categories, series, opts) {
+    opts = opts || {};
+    const W = 640, H = 260, padL = 34, padR = 16, padT = 16, padB = 28;
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    const n = categories.length;
+    const bw = Math.min(24, (innerW / n) * 0.7);
+    const gap = 2;
+    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}` });
+
+    [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+      const yy = padT + innerH - f * innerH;
+      svg.appendChild(svgEl("line", { class: "grid-line", x1: padL, x2: W - padR, y1: yy, y2: yy }));
+      const txt = svgEl("text", { class: "axis-text", x: 2, y: yy + 3 });
+      txt.textContent = Math.round(f * 100) + "%";
+      svg.appendChild(txt);
+    });
+
+    const step = Math.max(1, Math.round(n / 8));
+    categories.forEach((c, i) => {
+      const cx = padL + (i + 0.5) * (innerW / n);
+      let acc = 0;
+      series.forEach((s) => {
+        const v = s.values[i];
+        const h0 = padT + innerH - acc * innerH;
+        const h1 = padT + innerH - (acc + v) * innerH;
+        const segH = Math.max(0, h0 - h1 - gap);
+        const rect = svgEl("rect", { x: cx - bw / 2, y: h1, width: bw, height: segH, fill: s.color, rx: 1 });
+        rect.addEventListener("mousemove", (e) => showTooltip(e, `<b>${esc(categories[i])}</b><br>${esc(s.name)}: ${pct(v, 1)}`));
+        rect.addEventListener("mouseleave", hideTooltip);
+        svg.appendChild(rect);
+        acc += v;
+      });
+      if (i % step === 0 || i === n - 1) {
+        const txt = svgEl("text", { class: "axis-text", x: cx, y: H - 6, "text-anchor": "middle" });
+        txt.textContent = c;
+        svg.appendChild(txt);
+      }
+    });
+    svg.appendChild(svgEl("line", { class: "baseline", x1: padL, x2: W - padR, y1: padT + innerH, y2: padT + innerH }));
+
+    container.innerHTML = "";
+    const legend = document.createElement("div");
+    legend.className = "legend";
+    legend.innerHTML = series.map(s => `<span class="key"><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}</span>`).join("");
+    container.appendChild(legend);
+    container.appendChild(svg);
+  }
+
+  // ---------- scatter chart ----------
+  function scatterChart(container, points, opts) {
+    opts = opts || {};
+    const W = 900, H = 420, padL = 64, padR = 20, padT = 16, padB = 44;
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    const xs = points.map(p => p.x), ys = points.map(p => p.y);
+    const xMin = Math.min(...xs) * 0.95, xMax = Math.max(...xs) * 1.05;
+    const yMin = Math.min(...ys) * 0.9, yMax = Math.max(...ys) * 1.08;
+    const x = v => padL + ((v - xMin) / (xMax - xMin)) * innerW;
+    const y = v => padT + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
+
+    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}` });
+    for (let t = 0; t <= 4; t++) {
+      const yy = padT + (innerH * t) / 4;
+      svg.appendChild(svgEl("line", { class: "grid-line", x1: padL, x2: W - padR, y1: yy, y2: yy }));
+      const v = yMax - ((yMax - yMin) * t) / 4;
+      const txt = svgEl("text", { class: "axis-text", x: padL - 8, y: yy + 3, "text-anchor": "end" });
+      txt.textContent = fmt(v, 1);
+      svg.appendChild(txt);
+    }
+    for (let t = 0; t <= 4; t++) {
+      const xx = padL + (innerW * t) / 4;
+      const v = xMin + ((xMax - xMin) * t) / 4;
+      const txt = svgEl("text", { class: "axis-text", x: xx, y: padT + innerH + 16, "text-anchor": "middle" });
+      txt.textContent = fmt(v, 1);
+      svg.appendChild(txt);
+    }
+    const xLabel = svgEl("text", { class: "axis-text", x: padL + innerW / 2, y: padT + innerH + 36, "text-anchor": "middle" });
+    xLabel.textContent = opts.xLabel || "";
+    svg.appendChild(xLabel);
+    const yLabelX = 14, yLabelY = padT + innerH / 2;
+    const yLabel = svgEl("text", {
+      class: "axis-text", x: yLabelX, y: yLabelY, "text-anchor": "middle",
+      transform: `rotate(-90, ${yLabelX}, ${yLabelY})`,
+    });
+    yLabel.textContent = opts.yLabel || "";
+    svg.appendChild(yLabel);
+
+    const sorted = [...points].sort((a, b) => b.y - a.y);
+    const labelSet = new Set([sorted[0]?.label, sorted[sorted.length - 1]?.label, [...points].sort((a,b)=>b.x-a.x)[0]?.label]);
+
+    points.forEach((p) => {
+      const cx = x(p.x), cy = y(p.y);
+      const dot = svgEl("circle", { class: "mark-dot", cx, cy, r: 6, fill: "var(--series-1)" });
+      dot.addEventListener("mousemove", (e) => showTooltip(e, `<b>${esc(p.label)}</b><br>${esc(opts.xLabel)}: ${fmt(p.x, 2)}<br>${esc(opts.yLabel)}: ${fmt(p.y, 2)}`));
+      dot.addEventListener("mouseleave", hideTooltip);
+      svg.appendChild(dot);
+      if (labelSet.has(p.label)) {
+        const txt = svgEl("text", { class: "direct-label", x: cx + 8, y: cy - 8 });
+        txt.textContent = p.label;
+        svg.appendChild(txt);
+      }
+    });
+
+    container.innerHTML = "";
+    container.appendChild(svg);
+  }
+
+  // ---------- generic sortable/searchable table ----------
+  function renderTable(tableEl, columns, rows, opts) {
+    opts = opts || {};
+    let sortKey = opts.defaultSort || columns[0].key;
+    let sortDir = opts.defaultDir || "desc";
+
+    function draw() {
+      const sorted = [...rows].sort((a, b) => {
+        const av = a[sortKey], bv = b[sortKey];
+        let cmp;
+        if (typeof av === "string") cmp = av.localeCompare(bv);
+        else cmp = (av ?? -Infinity) - (bv ?? -Infinity);
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+      const thead = `<thead><tr>${columns.map(c => `<th data-key="${c.key}" class="${c.num ? "num" : ""} ${sortKey === c.key ? (sortDir === "asc" ? "sort-asc" : "sort-desc") : ""}">${esc(c.label)}</th>`).join("")}</tr></thead>`;
+      const tbody = `<tbody>${sorted.map(r => `<tr>${columns.map(c => `<td class="${c.num ? "num" : ""}">${c.fmt ? c.fmt(r[c.key], r) : esc(r[c.key])}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      tableEl.innerHTML = thead + tbody;
+      tableEl.querySelectorAll("th").forEach((th) => {
+        th.addEventListener("click", () => {
+          const key = th.getAttribute("data-key");
+          if (sortKey === key) sortDir = sortDir === "asc" ? "desc" : "asc";
+          else { sortKey = key; sortDir = "desc"; }
+          draw();
+        });
+      });
+    }
+    draw();
+    return { redraw: (newRows) => { rows = newRows; draw(); } };
+  }
+
+  // ================= build the page =================
+
+  function init() {
+    const meta = DATA.meta;
+    document.getElementById("hero-sub").textContent =
+      `${meta.league} • ${meta.first_season}–${meta.last_season} • ${meta.season_count} seasons • ${meta.fixture_count.toLocaleString()} fixtures • ${meta.team_count} teams`;
+
+    const kpis = [
+      { label: "Seasons tracked", value: meta.season_count },
+      { label: "Fixtures", value: meta.fixture_count.toLocaleString() },
+      { label: "Total goals", value: meta.total_goals.toLocaleString() },
+      { label: "Goals / game", value: fmt(meta.avg_goals_per_game, 2) },
+      { label: "Teams tracked", value: meta.team_count },
+      { label: "Latest champion", value: DATA.season_trends[DATA.season_trends.length - 1].champion },
+    ];
+    document.getElementById("kpi-row").innerHTML = kpis.map(k => `<div class="kpi"><p class="label">${esc(k.label)}</p><p class="value">${esc(k.value)}</p></div>`).join("");
+
+    document.getElementById("spot-grid").innerHTML = DATA.spotlights.map(s => `<div class="spot"><h3>${esc(s.title)}</h3><p>${esc(s.detail)}</p></div>`).join("");
+
+    // ---- season trends ----
+    const st = DATA.season_trends;
+    const categories = st.map(s => s.season);
+    lineChart(document.getElementById("chart-goals"), categories, [
+      { name: "Goals / game", color: "var(--series-1)", values: st.map(s => s.avg_goals_per_game) },
+    ], { tipFmt: v => fmt(v, 2), endLabel: true });
+
+    stackedColumnChart(document.getElementById("chart-outcomes"), categories, [
+      { name: "Home win", color: "var(--series-1)", values: st.map(s => s.home_win_pct) },
+      { name: "Draw", color: "var(--series-2)", values: st.map(s => s.draw_pct) },
+      { name: "Away win", color: "var(--series-3)", values: st.map(s => s.away_win_pct) },
+    ]);
+
+    const cardSeasons = st.filter(s => s.avg_cards_per_team !== null);
+    lineChart(document.getElementById("chart-cards"), cardSeasons.map(s => s.season), [
+      { name: "Cards / team / game", color: "var(--series-1)", values: cardSeasons.map(s => s.avg_cards_per_team) },
+    ], { tipFmt: v => fmt(v, 2), endLabel: true });
+
+    const xgSeasons = st.filter(s => s.avg_xg_per_team !== null);
+    if (xgSeasons.length) {
+      lineChart(document.getElementById("chart-xg-season"), xgSeasons.map(s => s.season), [
+        { name: "xG / team / game", color: "var(--series-1)", values: xgSeasons.map(s => s.avg_xg_per_team) },
+      ], { tipFmt: v => fmt(v, 2), endLabel: true });
+    } else {
+      document.getElementById("chart-xg-season").innerHTML = '<p class="hint">No xG data available yet.</p>';
+    }
+
+    addTableToggle("chart-goals", ["Season", "Goals/game"], st.map(s => [s.season, fmt(s.avg_goals_per_game, 2)]));
+    addTableToggle("chart-outcomes", ["Season", "Home win", "Draw", "Away win"], st.map(s => [s.season, pct(s.home_win_pct), pct(s.draw_pct), pct(s.away_win_pct)]));
+
+    // ---- all-time team table ----
+    const teamColumns = [
+      { key: "team", label: "Team" },
+      { key: "seasons", label: "Seasons", num: true },
+      { key: "played", label: "Played", num: true },
+      { key: "won", label: "W", num: true },
+      { key: "drawn", label: "D", num: true },
+      { key: "lost", label: "L", num: true },
+      { key: "gf", label: "GF", num: true },
+      { key: "ga", label: "GA", num: true },
+      { key: "gd", label: "GD", num: true, fmt: v => (v > 0 ? "+" : "") + v },
+      { key: "points", label: "Pts", num: true },
+      { key: "ppg", label: "PPG", num: true, fmt: v => fmt(v, 2) },
+      { key: "titles", label: "Titles", num: true },
+      { key: "top4", label: "Top 4", num: true },
+      { key: "best_position", label: "Best pos.", num: true },
+    ];
+    const teamTableEl = document.getElementById("team-table");
+    const teamTableApi = renderTable(teamTableEl, teamColumns, DATA.team_table, { defaultSort: "points", defaultDir: "desc" });
+    document.getElementById("team-search").addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      teamTableApi.redraw(DATA.team_table.filter(r => r.team.toLowerCase().includes(q)));
+    });
+
+    // ---- leaderboards ----
+    const byPoints = [...DATA.team_table].sort((a, b) => b.points - a.points).slice(0, 12);
+    hBarList(document.getElementById("chart-points"), byPoints, { valueKey: "points", fmtValue: v => fmt(v, 0) });
+
+    const byGoals = [...DATA.team_table].sort((a, b) => b.gf - a.gf).slice(0, 12);
+    hBarList(document.getElementById("chart-goals-total"), byGoals, { valueKey: "gf", fmtValue: v => fmt(v, 0) });
+
+    const byPpg = [...DATA.team_table].filter(t => t.seasons >= 3).sort((a, b) => b.ppg - a.ppg).slice(0, 12);
+    hBarList(document.getElementById("chart-ppg"), byPpg, { valueKey: "ppg", fmtValue: v => fmt(v, 2) });
+
+    const byTitles = [...DATA.team_table].filter(t => t.titles > 0).sort((a, b) => b.titles - a.titles).slice(0, 12);
+    if (byTitles.length) {
+      hBarList(document.getElementById("chart-titles"), byTitles, { valueKey: "titles", fmtValue: v => fmt(v, 0) });
+    } else {
+      document.getElementById("chart-titles").innerHTML = '<p class="hint">No titles recorded in this dataset.</p>';
+    }
+
+    // ---- playing style ----
+    const byPossession = [...DATA.team_style].sort((a, b) => b.avg_possession - a.avg_possession).slice(0, 12);
+    hBarList(document.getElementById("chart-possession"), byPossession, { valueKey: "avg_possession", fmtValue: v => fmt(v, 1) + "%" });
+
+    const byShots = [...DATA.team_style].sort((a, b) => b.avg_shots - a.avg_shots).slice(0, 12);
+    hBarList(document.getElementById("chart-shots"), byShots, { valueKey: "avg_shots", fmtValue: v => fmt(v, 1) });
+
+    const byPassAcc = [...DATA.team_style].filter(t => t.pass_accuracy !== null).sort((a, b) => b.pass_accuracy - a.pass_accuracy).slice(0, 12);
+    hBarList(document.getElementById("chart-passacc"), byPassAcc, { valueKey: "pass_accuracy", fmtValue: v => fmt(v, 1) + "%" });
+
+    const byCorners = [...DATA.team_style].sort((a, b) => b.avg_corners - a.avg_corners).slice(0, 12);
+    hBarList(document.getElementById("chart-corners"), byCorners, { valueKey: "avg_corners", fmtValue: v => fmt(v, 1) });
+
+    // ---- xG performance (diverging) ----
+    const xgSorted = [...DATA.xg_performance].sort((a, b) => b.diff_per_game - a.diff_per_game);
+    divBarList(document.getElementById("chart-xgdiff"), xgSorted, {
+      valueKey: "diff_per_game",
+      fmtValue: v => (v > 0 ? "+" : "") + fmt(v, 2),
+      tooltip: d => `<b>${esc(d.team)}</b><br>${d.goals_for} goals from ${fmt(d.xg_for, 1)} xG (${d.matches} matches)<br>${(d.diff_per_game > 0 ? "+" : "")}${fmt(d.diff_per_game, 3)} goals/game vs. xG`,
+    });
+    addTableToggle("chart-xgdiff", ["Team", "Matches", "xG", "Goals", "Diff/game"], xgSorted.map(d => [d.team, d.matches, fmt(d.xg_for,1), d.goals_for, (d.diff_per_game>0?"+":"")+fmt(d.diff_per_game,3)]));
+
+    // ---- shot efficiency scatter ----
+    scatterChart(document.getElementById("chart-scatter"), DATA.shot_efficiency.map(d => ({ x: d.shots_per_game, y: d.conversion_pct, label: d.team })), {
+      xLabel: "Shots per game", yLabel: "Conversion rate (%)",
+    });
+    addTableToggle("chart-scatter", ["Team", "Shots/game", "Conversion %", "Goals/game"], [...DATA.shot_efficiency].sort((a,b)=>b.conversion_pct-a.conversion_pct).map(d => [d.team, fmt(d.shots_per_game,1), fmt(d.conversion_pct,1)+"%", fmt(d.goals_per_game,2)]));
+
+    // ---- discipline ----
+    const worstDiscipline = [...DATA.discipline].sort((a, b) => b.trouble_score - a.trouble_score).slice(0, 10);
+    hBarList(document.getElementById("chart-cards-worst"), worstDiscipline, { valueKey: "cards_per_game", fmtValue: v => fmt(v, 2) });
+    const bestDiscipline = [...DATA.discipline].sort((a, b) => a.trouble_score - b.trouble_score).slice(0, 10);
+    hBarList(document.getElementById("chart-cards-best"), bestDiscipline, { valueKey: "cards_per_game", fmtValue: v => fmt(v, 2), alt: true });
+
+    // ---- importance ----
+    renderTable(document.getElementById("importance-table"), [
+      { key: "season", label: "Season" },
+      { key: "date", label: "Date" },
+      { key: "home", label: "Home" },
+      { key: "away", label: "Away" },
+      { key: "score", label: "Score" },
+      { key: "importance", label: "Importance", num: true, fmt: v => fmt(v, 3) },
+    ], DATA.importance.top_matches, { defaultSort: "importance", defaultDir: "desc" });
+
+    renderTable(document.getElementById("derby-table"), [
+      { key: "pair", label: "Fixture" },
+      { key: "meetings", label: "Derby meetings", num: true },
+    ], DATA.importance.top_derby_fixtures, { defaultSort: "meetings", defaultDir: "desc" });
+
+    // ---- promising teams ----
+    const promising = DATA.promising.points_trend.slice(0, 20);
+    divBarList(document.getElementById("chart-promising"), promising, {
+      valueKey: "delta",
+      fmtValue: v => (v > 0 ? "+" : "") + v,
+      tooltip: d => `<b>${esc(d.team)}</b><br>${d.points_earlier} pts (${esc(d.earlier_season)}) &rarr; ${d.points_latest} pts (${esc(d.latest_season)})<br>${(d.delta>0?"+":"")+d.delta} points`,
+    });
+
+    document.getElementById("footer").textContent = `Generated ${new Date(DATA.generated_at).toLocaleString()} from acca-bot's local Premier League dataset (data/acca-bot.sqlite3). Regenerate with scripts/build_history_dashboard.py.`;
+  }
+
+  function addTableToggle(chartElId, headers, rows) {
+    const container = document.getElementById(chartElId);
+    const details = document.createElement("details");
+    details.className = "table-toggle";
+    const summary = document.createElement("summary");
+    summary.textContent = "View as table";
+    details.appendChild(summary);
+    const table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML = `<thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    details.appendChild(table);
+    container.appendChild(details);
+  }
+
+  document.addEventListener("mousemove", moveTooltip);
+  init();
+})();
+</script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from pathlib import Path
@@ -65,6 +66,92 @@ CREATE TABLE IF NOT EXISTS standings_snapshots (
     points INTEGER NOT NULL,
     position INTEGER NOT NULL,
     PRIMARY KEY (league_id, season, matchday, team_id)
+);
+
+CREATE TABLE IF NOT EXISTS players (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    firstname TEXT,
+    lastname TEXT,
+    birth_date TEXT,
+    birth_country TEXT,
+    nationality TEXT,
+    height_cm INTEGER,
+    weight_kg INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS player_season_stats (
+    player_id INTEGER NOT NULL REFERENCES players(id),
+    team_id INTEGER NOT NULL REFERENCES teams(id),
+    league_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    position TEXT,
+    appearances INTEGER,
+    lineups INTEGER,
+    minutes INTEGER,
+    rating REAL,
+    shots_total INTEGER,
+    shots_on INTEGER,
+    goals INTEGER,
+    assists INTEGER,
+    saves INTEGER,
+    passes_total INTEGER,
+    passes_key INTEGER,
+    tackles_total INTEGER,
+    blocks INTEGER,
+    interceptions INTEGER,
+    duels_total INTEGER,
+    duels_won INTEGER,
+    dribbles_attempts INTEGER,
+    dribbles_success INTEGER,
+    fouls_drawn INTEGER,
+    fouls_committed INTEGER,
+    cards_yellow INTEGER,
+    cards_red INTEGER,
+    penalty_scored INTEGER,
+    penalty_missed INTEGER,
+    PRIMARY KEY (player_id, team_id, league_id, season)
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_season_stats_team_season
+    ON player_season_stats(team_id, league_id, season);
+
+CREATE TABLE IF NOT EXISTS team_season_stats (
+    league_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_id INTEGER NOT NULL REFERENCES teams(id),
+    form TEXT,
+    played_total INTEGER,
+    wins_home INTEGER,
+    wins_away INTEGER,
+    wins_total INTEGER,
+    draws_home INTEGER,
+    draws_away INTEGER,
+    draws_total INTEGER,
+    loses_home INTEGER,
+    loses_away INTEGER,
+    loses_total INTEGER,
+    goals_for_home INTEGER,
+    goals_for_away INTEGER,
+    goals_for_total INTEGER,
+    goals_against_home INTEGER,
+    goals_against_away INTEGER,
+    goals_against_total INTEGER,
+    clean_sheets_home INTEGER,
+    clean_sheets_away INTEGER,
+    clean_sheets_total INTEGER,
+    failed_to_score_home INTEGER,
+    failed_to_score_away INTEGER,
+    failed_to_score_total INTEGER,
+    penalty_scored_total INTEGER,
+    penalty_missed_total INTEGER,
+    biggest_win_streak INTEGER,
+    biggest_loss_streak INTEGER,
+    goals_for_minutes_json TEXT,
+    goals_for_under_over_json TEXT,
+    goals_against_minutes_json TEXT,
+    goals_against_under_over_json TEXT,
+    PRIMARY KEY (league_id, season, team_id)
 );
 
 CREATE TABLE IF NOT EXISTS fixture_importance (
@@ -281,6 +368,193 @@ def fetch_team_names(conn: sqlite3.Connection) -> dict[int, str]:
     conn.row_factory = sqlite3.Row
     cursor = conn.execute("SELECT id, name FROM teams")
     return {row["id"]: row["name"] for row in cursor.fetchall()}
+
+
+def fetch_teams_for_season(conn: sqlite3.Connection, *, league_id: int, season: int) -> list[int]:
+    """Distinct team ids that played in this league/season, derived from stored fixtures.
+
+    Avoids spending API requests to rediscover a season's clubs - we already
+    know them from the fixtures backfill.
+    """
+    cursor = conn.execute(
+        """
+        SELECT DISTINCT team_id FROM (
+            SELECT home_team_id AS team_id FROM fixtures WHERE league_id = ? AND season = ?
+            UNION
+            SELECT away_team_id AS team_id FROM fixtures WHERE league_id = ? AND season = ?
+        )
+        """,
+        (league_id, season, league_id, season),
+    )
+    return [row[0] for row in cursor.fetchall()]
+
+
+def _parse_measurement(raw: Any) -> int | None:
+    """Parse a height/weight field that may be '182', '182 cm', '79 kg', or empty/None."""
+    if not raw:
+        return None
+    digits = re.sub(r"[^\d]", "", str(raw))
+    return int(digits) if digits else None
+
+
+def upsert_player(conn: sqlite3.Connection, *, player: dict[str, Any]) -> None:
+    birth = player.get("birth") or {}
+    conn.execute(
+        """
+        INSERT INTO players (id, name, firstname, lastname, birth_date, birth_country, nationality, height_cm, weight_kg)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name, firstname = excluded.firstname, lastname = excluded.lastname,
+            birth_date = excluded.birth_date, birth_country = excluded.birth_country,
+            nationality = excluded.nationality, height_cm = excluded.height_cm, weight_kg = excluded.weight_kg
+        """,
+        (
+            player.get("id"),
+            player.get("name", ""),
+            player.get("firstname"),
+            player.get("lastname"),
+            birth.get("date"),
+            birth.get("country"),
+            player.get("nationality"),
+            _parse_measurement(player.get("height")),
+            _parse_measurement(player.get("weight")),
+        ),
+    )
+
+
+def store_players_payload(conn: sqlite3.Connection, payload: dict[str, Any], *, league_id: int, season: int) -> int:
+    """Normalize and store one page of the /players response. Returns player-rows stored."""
+    stored = 0
+    for item in payload.get("response", []):
+        player = item.get("player", {})
+        if player.get("id") is None:
+            continue
+        upsert_player(conn, player=player)
+        for stats in item.get("statistics", []):
+            team = stats.get("team") or {}
+            team_id = team.get("id")
+            if team_id is None:
+                continue
+            games = stats.get("games") or {}
+            substitutes = stats.get("substitutes") or {}
+            shots = stats.get("shots") or {}
+            goals = stats.get("goals") or {}
+            passes = stats.get("passes") or {}
+            tackles = stats.get("tackles") or {}
+            duels = stats.get("duels") or {}
+            dribbles = stats.get("dribbles") or {}
+            fouls = stats.get("fouls") or {}
+            cards = stats.get("cards") or {}
+            penalty = stats.get("penalty") or {}
+            conn.execute(
+                """
+                INSERT INTO player_season_stats (
+                    player_id, team_id, league_id, season, position, appearances, lineups, minutes, rating,
+                    shots_total, shots_on, goals, assists, saves, passes_total, passes_key,
+                    tackles_total, blocks, interceptions, duels_total, duels_won,
+                    dribbles_attempts, dribbles_success, fouls_drawn, fouls_committed,
+                    cards_yellow, cards_red, penalty_scored, penalty_missed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(player_id, team_id, league_id, season) DO UPDATE SET
+                    position = excluded.position, appearances = excluded.appearances, lineups = excluded.lineups,
+                    minutes = excluded.minutes, rating = excluded.rating,
+                    shots_total = excluded.shots_total, shots_on = excluded.shots_on,
+                    goals = excluded.goals, assists = excluded.assists, saves = excluded.saves,
+                    passes_total = excluded.passes_total, passes_key = excluded.passes_key,
+                    tackles_total = excluded.tackles_total, blocks = excluded.blocks, interceptions = excluded.interceptions,
+                    duels_total = excluded.duels_total, duels_won = excluded.duels_won,
+                    dribbles_attempts = excluded.dribbles_attempts, dribbles_success = excluded.dribbles_success,
+                    fouls_drawn = excluded.fouls_drawn, fouls_committed = excluded.fouls_committed,
+                    cards_yellow = excluded.cards_yellow, cards_red = excluded.cards_red,
+                    penalty_scored = excluded.penalty_scored, penalty_missed = excluded.penalty_missed
+                """,
+                (
+                    player["id"], team_id, league_id, season,
+                    games.get("position"), games.get("appearences"), games.get("lineups"), games.get("minutes"),
+                    _clean_stat_value(games.get("rating")),
+                    shots.get("total"), shots.get("on"),
+                    goals.get("total"), goals.get("assists"), goals.get("saves"),
+                    passes.get("total"), passes.get("key"),
+                    tackles.get("total"), tackles.get("blocks"), tackles.get("interceptions"),
+                    duels.get("total"), duels.get("won"),
+                    dribbles.get("attempts"), dribbles.get("success"),
+                    fouls.get("drawn"), fouls.get("committed"),
+                    cards.get("yellow"), cards.get("red"),
+                    penalty.get("scored"), penalty.get("missed"),
+                ),
+            )
+            stored += 1
+            _ = substitutes  # not stored yet - bench/in/out are low priority, kept for future use
+    conn.commit()
+    return stored
+
+
+def store_team_statistics_payload(conn: sqlite3.Connection, payload: dict[str, Any], *, league_id: int, season: int, team_id: int) -> bool:
+    """Normalize and store the /teams/statistics response. Returns True if stored."""
+    data = payload.get("response")
+    if not data:
+        return False
+    fixtures_ = data.get("fixtures", {})
+    wins = fixtures_.get("wins", {})
+    draws = fixtures_.get("draws", {})
+    loses = fixtures_.get("loses", {})
+    goals = data.get("goals", {})
+    goals_for = goals.get("for", {})
+    goals_against = goals.get("against", {})
+    clean_sheet = data.get("clean_sheet", {})
+    failed_to_score = data.get("failed_to_score", {})
+    penalty = data.get("penalty", {})
+    biggest = data.get("biggest", {})
+    biggest_streak = biggest.get("streak", {})
+
+    conn.execute(
+        """
+        INSERT INTO team_season_stats (
+            league_id, season, team_id, form, played_total,
+            wins_home, wins_away, wins_total, draws_home, draws_away, draws_total,
+            loses_home, loses_away, loses_total,
+            goals_for_home, goals_for_away, goals_for_total,
+            goals_against_home, goals_against_away, goals_against_total,
+            clean_sheets_home, clean_sheets_away, clean_sheets_total,
+            failed_to_score_home, failed_to_score_away, failed_to_score_total,
+            penalty_scored_total, penalty_missed_total,
+            biggest_win_streak, biggest_loss_streak,
+            goals_for_minutes_json, goals_for_under_over_json,
+            goals_against_minutes_json, goals_against_under_over_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(league_id, season, team_id) DO UPDATE SET
+            form = excluded.form, played_total = excluded.played_total,
+            wins_home = excluded.wins_home, wins_away = excluded.wins_away, wins_total = excluded.wins_total,
+            draws_home = excluded.draws_home, draws_away = excluded.draws_away, draws_total = excluded.draws_total,
+            loses_home = excluded.loses_home, loses_away = excluded.loses_away, loses_total = excluded.loses_total,
+            goals_for_home = excluded.goals_for_home, goals_for_away = excluded.goals_for_away, goals_for_total = excluded.goals_for_total,
+            goals_against_home = excluded.goals_against_home, goals_against_away = excluded.goals_against_away, goals_against_total = excluded.goals_against_total,
+            clean_sheets_home = excluded.clean_sheets_home, clean_sheets_away = excluded.clean_sheets_away, clean_sheets_total = excluded.clean_sheets_total,
+            failed_to_score_home = excluded.failed_to_score_home, failed_to_score_away = excluded.failed_to_score_away, failed_to_score_total = excluded.failed_to_score_total,
+            penalty_scored_total = excluded.penalty_scored_total, penalty_missed_total = excluded.penalty_missed_total,
+            biggest_win_streak = excluded.biggest_win_streak, biggest_loss_streak = excluded.biggest_loss_streak,
+            goals_for_minutes_json = excluded.goals_for_minutes_json, goals_for_under_over_json = excluded.goals_for_under_over_json,
+            goals_against_minutes_json = excluded.goals_against_minutes_json, goals_against_under_over_json = excluded.goals_against_under_over_json
+        """,
+        (
+            league_id, season, team_id, data.get("form"), fixtures_.get("played", {}).get("total"),
+            wins.get("home"), wins.get("away"), wins.get("total"),
+            draws.get("home"), draws.get("away"), draws.get("total"),
+            loses.get("home"), loses.get("away"), loses.get("total"),
+            (goals_for.get("total") or {}).get("home"), (goals_for.get("total") or {}).get("away"), (goals_for.get("total") or {}).get("total"),
+            (goals_against.get("total") or {}).get("home"), (goals_against.get("total") or {}).get("away"), (goals_against.get("total") or {}).get("total"),
+            clean_sheet.get("home"), clean_sheet.get("away"), clean_sheet.get("total"),
+            failed_to_score.get("home"), failed_to_score.get("away"), failed_to_score.get("total"),
+            (penalty.get("scored") or {}).get("total"), (penalty.get("missed") or {}).get("total"),
+            biggest_streak.get("wins"), biggest_streak.get("loses"),
+            json.dumps(goals_for.get("minute")) if goals_for.get("minute") else None,
+            json.dumps(goals_for.get("under_over")) if goals_for.get("under_over") else None,
+            json.dumps(goals_against.get("minute")) if goals_against.get("minute") else None,
+            json.dumps(goals_against.get("under_over")) if goals_against.get("under_over") else None,
+        ),
+    )
+    conn.commit()
+    return True
 
 
 def store_standings_snapshot(

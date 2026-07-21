@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Premier League Data Explorer</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good-text:      #006300;
+
+    --series-1: #2a78d6; /* blue   */
+    --series-2: #008300; /* green  */
+    --series-3: #e87ba4; /* magenta*/
+    --series-4: #eda100; /* yellow */
+    --series-5: #1baf7a; /* aqua   */
+    --series-6: #eb6834; /* orange */
+    --series-7: #4a3aa7; /* violet */
+    --series-8: #e34948; /* red    */
+
+    --seq-100: #cde2fb; --seq-150: #b7d3f6; --seq-200: #9ec5f4; --seq-250: #86b6ef;
+    --seq-300: #6da7ec; --seq-350: #5598e7; --seq-400: #3987e5; --seq-450: #2a78d6;
+    --seq-500: #256abf; --seq-550: #1c5cab; --seq-600: #184f95; --seq-650: #104281;
+    --seq-700: #0d366b;
+
+    --div-pos: #2a78d6;  /* blue */
+    --div-neg: #e34948;  /* red */
+    --div-mid: #f0efec;
+
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --good-text:      #0ca30c;
+
+      --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+      --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+
+      --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --good-text:      #0ca30c;
+
+    --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+    --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+
+    --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body.viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 64px; }
+
+  header.hero {
+    padding: 40px 20px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-1);
+  }
+  header.hero .wrap { padding-bottom: 0; }
+  header.hero h1 { margin: 0 0 6px; font-size: clamp(24px, 4vw, 34px); font-weight: 750; }
+  header.hero p.sub { margin: 0; color: var(--text-secondary); font-size: 15px; max-width: 70ch; }
+  header.hero p.note { margin: 10px 0 0; color: var(--text-muted); font-size: 13px; max-width: 70ch; }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0,1fr));
+    gap: 12px;
+    margin-top: 26px;
+  }
+  .kpi {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 14px 12px;
+    min-width: 0;
+  }
+  .kpi .label { color: var(--text-secondary); font-size: 12px; margin: 0 0 6px; }
+  .kpi .value { font-size: 24px; font-weight: 700; margin: 0; }
+  .kpi .value small { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+
+  nav.tabs {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; gap: 2px; overflow-x: auto;
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+  }
+  nav.tabs a {
+    display: inline-block; padding: 12px 14px; font-size: 13px; font-weight: 650;
+    color: var(--text-secondary); text-decoration: none; white-space: nowrap;
+    border-bottom: 2px solid transparent;
+  }
+  nav.tabs a:hover { color: var(--text-primary); border-bottom-color: var(--baseline); }
+
+  section.block { padding: 40px 0 8px; border-bottom: 1px solid var(--border); }
+  section.block:last-of-type { border-bottom: none; }
+  section.block h2 { font-size: 20px; margin: 0 0 4px; scroll-margin-top: 56px; }
+  section.block p.desc { color: var(--text-secondary); margin: 0 0 20px; max-width: 78ch; font-size: 13.5px; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 18px; min-width: 0;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  .card h3 { font-size: 14px; margin: 0 0 2px; }
+  .card p.hint { margin: 0 0 14px; color: var(--text-muted); font-size: 12px; }
+
+  .spot-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+  .spot {
+    background: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--series-1);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .spot h3 { margin: 0 0 6px; font-size: 14px; }
+  .spot p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+
+  /* bar chart (HTML/CSS based) */
+  .barlist { display: flex; flex-direction: column; gap: 6px; }
+  .barlist .row { display: grid; grid-template-columns: 128px 1fr 56px; align-items: center; gap: 8px; }
+  .barlist .row .name { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barlist .row .track { position: relative; height: 16px; background: var(--grid); border-radius: 4px; overflow: hidden; }
+  .barlist .row .fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .barlist .row .fill.alt { background: var(--series-5); }
+  .barlist .row .val { font-size: 12.5px; color: var(--text-primary); font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+  .barlist .row.highlight .name, .barlist .row.highlight .val { color: var(--text-primary); font-weight: 750; }
+
+  /* diverging bar */
+  .divlist .row { display: grid; grid-template-columns: 128px 1fr 64px; align-items: center; gap: 8px; }
+  .divlist .row .name { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .divlist .row .track { position: relative; height: 16px; background: var(--div-mid); border-radius: 4px; overflow: hidden; }
+  .divlist .row .track::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--baseline); }
+  .divlist .row .fill { position: absolute; top: 0; height: 100%; }
+  .divlist .row .fill.pos { left: 50%; background: var(--div-pos); border-radius: 0 4px 4px 0; }
+  .divlist .row .fill.neg { right: 50%; background: var(--div-neg); border-radius: 4px 0 0 4px; }
+  .divlist .row .val { font-size: 12.5px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+
+  svg.chart { width: 100%; height: auto; overflow: visible; display: block; }
+  svg.chart .grid-line { stroke: var(--grid); stroke-width: 1; }
+  svg.chart .baseline { stroke: var(--baseline); stroke-width: 1; }
+  svg.chart .axis-text { fill: var(--text-muted); font-size: 10.5px; }
+  svg.chart .mark-dot { stroke: var(--surface-1); stroke-width: 2; }
+  svg.chart .direct-label { fill: var(--text-secondary); font-size: 11px; font-weight: 650; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 4px; }
+  .legend .key { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100;
+    background: var(--text-primary); color: var(--surface-1);
+    font-size: 12px; line-height: 1.4; padding: 7px 10px; border-radius: 6px;
+    max-width: 240px; opacity: 0; transform: translate(-50%, -100%); transition: opacity .08s;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip b { font-weight: 700; }
+
+  details.table-toggle { margin-top: 14px; }
+  details.table-toggle summary {
+    cursor: pointer; font-size: 12px; color: var(--text-secondary); font-weight: 650;
+    list-style: none;
+  }
+  details.table-toggle summary::-webkit-details-marker { display: none; }
+  details.table-toggle summary::before { content: "\25B8  "; }
+  details.table-toggle[open] summary::before { content: "\25BE  "; }
+
+  table.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  table.data-table th, table.data-table td {
+    padding: 7px 9px; text-align: left; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.data-table th {
+    color: var(--text-muted); font-weight: 650; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .02em; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface-1);
+  }
+  table.data-table th.sort-asc::after { content: " \2191"; }
+  table.data-table th.sort-desc::after { content: " \2193"; }
+  table.data-table td.num, table.data-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data-table tbody tr:hover { background: rgba(128,128,128,.08); }
+
+  .table-scroll { max-height: 560px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .table-scroll table.data-table { margin-top: 0; }
+
+  input.search {
+    width: 100%; max-width: 320px; padding: 8px 10px; margin-bottom: 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); color: var(--text-primary);
+    font: inherit; font-size: 13px;
+  }
+
+  footer.site {
+    padding: 26px 20px 40px; text-align: center; color: var(--text-muted); font-size: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .card-grid { grid-template-columns: 1fr; }
+    .spot-grid { grid-template-columns: 1fr; }
+    .barlist .row, .divlist .row { grid-template-columns: 92px 1fr 50px; }
+  }
+</style>
+</head>
+<body class="viz-root">
+<header class="hero">
+  <div class="wrap">
+    <h1>Premier League Data Explorer</h1>
+    <p class="sub" id="hero-sub">Loading&hellip;</p>
+    <p class="note">Built from match-by-match results, team stats and computed fixture-importance scores gathered by acca-bot. All figures are team/match level -- the underlying data source has no individual player statistics, so "ones to watch" below are teams, identified from form, points trajectories and expected-goals over/under-performance rather than player ratings.</p>
+    <div class="kpi-row" id="kpi-row"></div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <a href="#spotlights">Spotlights</a>
+  <a href="#season-trends">Season trends</a>
+  <a href="#all-time">All-time table</a>
+  <a href="#leaderboards">Leaderboards</a>
+  <a href="#style">Playing style</a>
+  <a href="#xg">xG performance</a>
+  <a href="#efficiency">Shot efficiency</a>
+  <a href="#discipline">Discipline</a>
+  <a href="#importance">Big matches</a>
+  <a href="#promising">Teams to watch</a>
+</nav>
+
+<div class="wrap">
+
+<section class="block" id="spotlights">
+  <h2>Spotlights</h2>
+  <p class="desc">Auto-generated from the numbers below -- a quick read on what stands out across every season in the dataset.</p>
+  <div class="spot-grid" id="spot-grid"></div>
+</section>
+
+<section class="block" id="season-trends">
+  <h2>Season trends</h2>
+  <p class="desc">How the league itself has changed season to season: scoring rate, the home/draw/away split, and (where match-stats exist, 2014/15 onward) cards and expected goals.</p>
+  <div class="card-grid">
+    <div class="card">
+      <h3>Goals per game</h3>
+      <p class="hint">Average total goals in a match, by season</p>
+      <div id="chart-goals"></div>
+    </div>
+    <div class="card">
+      <h3>Match outcome share</h3>
+      <p class="hint">Home win / draw / away win, as a share of matches each season</p>
+      <div id="chart-outcomes"></div>
+    </div>
+    <div class="card">
+      <h3>Cards per team per game</h3>
+      <p class="hint">Yellow + red cards shown, averaged per team per match (data from 2014/15)</p>
+      <div id="chart-cards"></div>
+    </div>
+    <div class="card">
+      <h3>Expected goals (xG) per team per game</h3>
+      <p class="hint">Average team xG per match (data from 2022/23, when xG capture began)</p>
+      <div id="chart-xg-season"></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="all-time">
+  <h2>All-time team table</h2>
+  <p class="desc">Every team's combined record across all seasons in the dataset -- search, or click a column to sort.</p>
+  <input class="search" id="team-search" type="search" placeholder="Search teams&hellip;">
+  <div class="table-scroll"><table class="data-table" id="team-table"></table></div>
+</section>
+
+<section class="block" id="leaderboards">
+  <h2>Leaderboards</h2>
+  <p class="desc">Top 12 by points, goals scored, points-per-game and league titles, combined across every season played.</p>
+  <div class="card-grid">
+    <div class="card"><h3>Most points, all-time</h3><p class="hint">Total league points earned</p><div id="chart-points"></div></div>
+    <div class="card"><h3>Most goals scored, all-time</h3><p class="hint">Total goals scored across all matches</p><div id="chart-goals-total"></div></div>
+    <div class="card"><h3>Best points-per-game</h3><p class="hint">Minimum 3 seasons in the dataset</p><div id="chart-ppg"></div></div>
+    <div class="card"><h3>Most titles</h3><p class="hint">Finished 1st at season end</p><div id="chart-titles"></div></div>
+  </div>
+</section>
+
+<section class="block" id="style">
+  <h2>Playing style</h2>
+  <p class="desc">Averaged from every match with recorded stats (2014/15 onward), teams with at least 20 sampled matches.</p>
+  <div class="card-grid">
+    <div class="card"><h3>Possession leaders</h3><p class="hint">Average possession %</p><div id="chart-possession"></div></div>
+    <div class="card"><h3>Shot volume leaders</h3><p class="hint">Average shots per game</p><div id="chart-shots"></div></div>
+    <div class="card"><h3>Pass accuracy leaders</h3><p class="hint">Completed passes as % of attempted</p><div id="chart-passacc"></div></div>
+    <div class="card"><h3>Corners per game</h3><p class="hint">Average corners won per match</p><div id="chart-corners"></div></div>
+  </div>
+</section>
+
+<section class="block" id="xg">
+  <h2>Expected goals: over- and under-performance</h2>
+  <p class="desc">Goals actually scored minus expected goals (xG), per game, since 2022/23 (when xG capture began). Positive = more clinical than the underlying chances suggest; negative = created the chances but didn't convert them -- a common signal for regression toward the mean next season.</p>
+  <div class="card wide">
+    <div id="chart-xgdiff"></div>
+  </div>
+</section>
+
+<section class="block" id="efficiency">
+  <h2>Shot efficiency</h2>
+  <p class="desc">Shot volume vs. conversion rate -- teams in the upper-right create <em>and</em> finish chances; upper-left create a lot but waste them; lower-right shoot rarely but clinically.</p>
+  <div class="card wide">
+    <div id="chart-scatter"></div>
+  </div>
+</section>
+
+<section class="block" id="discipline">
+  <h2>Discipline</h2>
+  <p class="desc">Cards per game (yellow + 2&times; red, to weight sendings-off), teams with at least 20 sampled matches.</p>
+  <div class="card-grid">
+    <div class="card"><h3>Most cards per game</h3><p class="hint">Top 10</p><div id="chart-cards-worst"></div></div>
+    <div class="card"><h3>Fewest cards per game</h3><p class="hint">Top 10</p><div id="chart-cards-best"></div></div>
+  </div>
+</section>
+
+<section class="block" id="importance">
+  <h2>Biggest matches</h2>
+  <p class="desc">Fixture "importance" is a computed score blending title race, European-qualification and relegation stakes at kickoff (plus a derby flag). Higher = more was riding on the result.</p>
+  <div class="card-grid">
+    <div class="card wide">
+      <h3>Highest-stakes matches in the dataset</h3>
+      <div class="table-scroll"><table class="data-table" id="importance-table"></table></div>
+    </div>
+    <div class="card wide">
+      <h3>Most-played derby fixtures</h3>
+      <p class="hint">By number of meetings flagged as a derby</p>
+      <div class="table-scroll"><table class="data-table" id="derby-table"></table></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="promising">
+  <h2>Teams to watch</h2>
+  <p class="desc">Points earned in the most recent season vs. two seasons earlier, for every team that played both -- the clearest read on which sides are genuinely trending, independent of a single lucky or unlucky season.</p>
+  <div class="card wide">
+    <div id="chart-promising"></div>
+  </div>
+</section>
+
+</div>
+
+<footer class="site" id="footer"></footer>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = {"generated_at":"2026-07-20T23:48:01+00:00","meta":{"league":"Premier League","seasons":["2010/11","2011/12","2012/13","2013/14","2014/15","2015/16","2016/17","2017/18","2018/19","2019/20","2020/21","2021/22","2022/23","2023/24","2024/25","2025/26"],"season_count":16,"first_season":"2010/11","last_season":"2025/26","fixture_count":6080,"team_count":41,"total_goals":17018,"avg_goals_per_game":2.799},"season_trends":[{"season":"2010/11","matches":380,"avg_goals_per_game":2.797,"home_win_pct":0.4711,"draw_pct":0.2921,"away_win_pct":0.2368,"avg_cards_per_team":null,"avg_shots_per_team":null,"avg_xg_per_team":null,"champion":"Manchester United","relegated":["Blackpool","Wigan","West Ham"]},{"season":"2011/12","matches":380,"avg_goals_per_game":2.805,"home_win_pct":0.45,"draw_pct":0.2447,"away_win_pct":0.3053,"avg_cards_per_team":null,"avg_shots_per_team":null,"avg_xg_per_team":null,"champion":"Manchester City","relegated":["Bolton","Blackburn","Wolves"]},{"season":"2012/13","matches":380,"avg_goals_per_game":2.797,"home_win_pct":0.4368,"draw_pct":0.2842,"away_win_pct":0.2789,"avg_cards_per_team":null,"avg_shots_per_team":null,"avg_xg_per_team":null,"champion":"Manchester United","relegated":["Wigan","Reading","QPR"]},{"season":"2013/14","matches":380,"avg_goals_per_game":2.768,"home_win_pct":0.4711,"draw_pct":0.2053,"away_win_pct":0.3237,"avg_cards_per_team":null,"avg_shots_per_team":null,"avg_xg_per_team":null,"champion":"Manchester City","relegated":["Norwich","Fulham","Cardiff"]},{"season":"2014/15","matches":380,"avg_goals_per_game":2.566,"home_win_pct":0.4526,"draw_pct":0.2447,"away_win_pct":0.3026,"avg_cards_per_team":2.01,"avg_shots_per_team":10.0,"avg_xg_per_team":null,"champion":"Chelsea","relegated":["Hull City","Burnley","QPR"]},{"season":"2015/16","matches":380,"avg_goals_per_game":2.7,"home_win_pct":0.4132,"draw_pct":0.2816,"away_win_pct":0.3053,"avg_cards_per_team":1.82,"avg_shots_per_team":12.8,"avg_xg_per_team":null,"champion":"Leicester","relegated":["Newcastle","Norwich","Aston Villa"]},{"season":"2016/17","matches":380,"avg_goals_per_game":2.8,"home_win_pct":0.4921,"draw_pct":0.2211,"away_win_pct":0.2868,"avg_cards_per_team":2.02,"avg_shots_per_team":12.79,"avg_xg_per_team":null,"champion":"Chelsea","relegated":["Hull City","Middlesbrough","Sunderland"]},{"season":"2017/18","matches":380,"avg_goals_per_game":2.679,"home_win_pct":0.4553,"draw_pct":0.2605,"away_win_pct":0.2842,"avg_cards_per_team":1.78,"avg_shots_per_team":12.22,"avg_xg_per_team":null,"champion":"Manchester City","relegated":["Swansea","West Brom","Stoke City"]},{"season":"2018/19","matches":380,"avg_goals_per_game":2.821,"home_win_pct":0.4763,"draw_pct":0.1868,"away_win_pct":0.3368,"avg_cards_per_team":1.84,"avg_shots_per_team":12.68,"avg_xg_per_team":null,"champion":"Manchester City","relegated":["Cardiff","Fulham","Huddersfield"]},{"season":"2019/20","matches":380,"avg_goals_per_game":2.721,"home_win_pct":0.4526,"draw_pct":0.2421,"away_win_pct":0.3053,"avg_cards_per_team":1.85,"avg_shots_per_team":12.37,"avg_xg_per_team":null,"champion":"Liverpool","relegated":["Watford","Bournemouth","Norwich"]},{"season":"2020/21","matches":380,"avg_goals_per_game":2.695,"home_win_pct":0.3789,"draw_pct":0.2184,"away_win_pct":0.4026,"avg_cards_per_team":1.68,"avg_shots_per_team":12.12,"avg_xg_per_team":null,"champion":"Manchester City","relegated":["Fulham","West Brom","Sheffield Utd"]},{"season":"2021/22","matches":380,"avg_goals_per_game":2.818,"home_win_pct":0.4289,"draw_pct":0.2316,"away_win_pct":0.3395,"avg_cards_per_team":1.93,"avg_shots_per_team":12.82,"avg_xg_per_team":null,"champion":"Manchester City","relegated":["Leeds","Watford","Norwich"]},{"season":"2022/23","matches":380,"avg_goals_per_game":2.853,"home_win_pct":0.4842,"draw_pct":0.2289,"away_win_pct":0.2868,"avg_cards_per_team":1.95,"avg_shots_per_team":12.65,"avg_xg_per_team":1.538,"champion":"Manchester City","relegated":["Leicester","Leeds","Southampton"]},{"season":"2023/24","matches":380,"avg_goals_per_game":3.279,"home_win_pct":0.4605,"draw_pct":0.2158,"away_win_pct":0.3237,"avg_cards_per_team":2.29,"avg_shots_per_team":13.79,"avg_xg_per_team":1.572,"champion":"Manchester City","relegated":["Luton","Burnley","Sheffield Utd"]},{"season":"2024/25","matches":380,"avg_goals_per_game":2.934,"home_win_pct":0.4079,"draw_pct":0.2447,"away_win_pct":0.3474,"avg_cards_per_team":2.27,"avg_shots_per_team":12.95,"avg_xg_per_team":1.439,"champion":"Liverpool","relegated":["Leicester","Ipswich","Southampton"]},{"season":"2025/26","matches":380,"avg_goals_per_game":2.75,"home_win_pct":0.4263,"draw_pct":0.2737,"away_win_pct":0.3,"avg_cards_per_team":2.03,"avg_shots_per_team":12.51,"avg_xg_per_team":1.397,"champion":"Arsenal","relegated":["West Ham","Burnley","Wolves"]}],"team_table":[{"team":"Manchester City","seasons":16,"played":608,"won":411,"drawn":101,"lost":96,"gf":1379,"ga":540,"gd":839,"points":1334,"ppg":2.194,"titles":8,"top4":16,"relegations":0,"best_position":1},{"team":"Liverpool","seasons":16,"played":608,"won":345,"drawn":143,"lost":120,"gf":1201,"ga":660,"gd":541,"points":1178,"ppg":1.938,"titles":2,"top4":9,"relegations":0,"best_position":1},{"team":"Arsenal","seasons":16,"played":608,"won":344,"drawn":130,"lost":134,"gf":1137,"ga":656,"gd":481,"points":1162,"ppg":1.911,"titles":1,"top4":10,"relegations":0,"best_position":1},{"team":"Manchester United","seasons":16,"played":608,"won":326,"drawn":142,"lost":140,"gf":1039,"ga":681,"gd":358,"points":1120,"ppg":1.842,"titles":2,"top4":9,"relegations":0,"best_position":1},{"team":"Chelsea","seasons":16,"played":608,"won":319,"drawn":142,"lost":147,"gf":1062,"ga":668,"gd":394,"points":1099,"ppg":1.808,"titles":2,"top4":9,"relegations":0,"best_position":1},{"team":"Tottenham","seasons":16,"played":608,"won":303,"drawn":128,"lost":177,"gf":1050,"ga":751,"gd":299,"points":1037,"ppg":1.706,"titles":0,"top4":6,"relegations":0,"best_position":2},{"team":"Everton","seasons":16,"played":608,"won":219,"drawn":174,"lost":215,"gf":781,"ga":789,"gd":-8,"points":831,"ppg":1.367,"titles":0,"top4":0,"relegations":0,"best_position":5},{"team":"Newcastle","seasons":15,"played":570,"won":206,"drawn":132,"lost":232,"gf":767,"ga":837,"gd":-70,"points":750,"ppg":1.316,"titles":0,"top4":2,"relegations":1,"best_position":4},{"team":"West Ham","seasons":15,"played":570,"won":186,"drawn":143,"lost":241,"gf":749,"ga":875,"gd":-126,"points":701,"ppg":1.23,"titles":0,"top4":0,"relegations":2,"best_position":6},{"team":"Aston Villa","seasons":13,"played":494,"won":166,"drawn":117,"lost":211,"gf":618,"ga":749,"gd":-131,"points":615,"ppg":1.245,"titles":0,"top4":2,"relegations":1,"best_position":4},{"team":"Crystal Palace","seasons":13,"played":494,"won":156,"drawn":128,"lost":210,"gf":576,"ga":692,"gd":-116,"points":596,"ppg":1.206,"titles":0,"top4":0,"relegations":0,"best_position":11},{"team":"Southampton","seasons":12,"played":456,"won":132,"drawn":117,"lost":207,"gf":542,"ga":703,"gd":-161,"points":513,"ppg":1.125,"titles":0,"top4":0,"relegations":2,"best_position":7},{"team":"Leicester","seasons":10,"played":380,"won":140,"drawn":84,"lost":156,"gf":550,"ga":560,"gd":-10,"points":504,"ppg":1.326,"titles":1,"top4":1,"relegations":2,"best_position":1},{"team":"Fulham","seasons":10,"played":380,"won":115,"drawn":90,"lost":175,"gf":459,"ga":592,"gd":-133,"points":435,"ppg":1.145,"titles":0,"top4":0,"relegations":3,"best_position":8},{"team":"Brighton","seasons":9,"played":342,"won":108,"drawn":109,"lost":125,"gf":435,"ga":478,"gd":-43,"points":433,"ppg":1.266,"titles":0,"top4":0,"relegations":0,"best_position":6},{"team":"Wolves","seasons":10,"played":380,"won":113,"drawn":87,"lost":180,"gf":420,"ga":589,"gd":-169,"points":426,"ppg":1.121,"titles":0,"top4":0,"relegations":2,"best_position":6},{"team":"Bournemouth","seasons":9,"played":342,"won":108,"drawn":87,"lost":147,"gf":448,"ga":568,"gd":-120,"points":411,"ppg":1.202,"titles":0,"top4":0,"relegations":1,"best_position":6},{"team":"West Brom","seasons":9,"played":342,"won":90,"drawn":98,"lost":154,"gf":378,"ga":521,"gd":-143,"points":368,"ppg":1.076,"titles":0,"top4":0,"relegations":2,"best_position":8},{"team":"Stoke City","seasons":8,"played":304,"won":93,"drawn":86,"lost":125,"gf":326,"ga":422,"gd":-96,"points":365,"ppg":1.201,"titles":0,"top4":0,"relegations":1,"best_position":9},{"team":"Burnley","seasons":9,"played":342,"won":84,"drawn":89,"lost":169,"gf":337,"ga":526,"gd":-189,"points":341,"ppg":0.997,"titles":0,"top4":0,"relegations":3,"best_position":7},{"team":"Sunderland","seasons":8,"played":304,"won":78,"drawn":90,"lost":136,"gf":322,"ga":448,"gd":-126,"points":324,"ppg":1.066,"titles":0,"top4":0,"relegations":1,"best_position":10},{"team":"Swansea","seasons":7,"played":266,"won":82,"drawn":66,"lost":118,"gf":306,"ga":383,"gd":-77,"points":312,"ppg":1.173,"titles":0,"top4":0,"relegations":1,"best_position":8},{"team":"Brentford","seasons":5,"played":190,"won":68,"drawn":49,"lost":73,"gf":283,"ga":276,"gd":7,"points":253,"ppg":1.332,"titles":0,"top4":0,"relegations":0,"best_position":9},{"team":"Watford","seasons":6,"played":228,"won":62,"drawn":47,"lost":119,"gf":246,"ga":382,"gd":-136,"points":233,"ppg":1.022,"titles":0,"top4":0,"relegations":2,"best_position":10},{"team":"Norwich","seasons":6,"played":228,"won":49,"drawn":54,"lost":125,"gf":209,"ga":412,"gd":-203,"points":201,"ppg":0.882,"titles":0,"top4":0,"relegations":4,"best_position":12},{"team":"Nottingham Forest","seasons":4,"played":152,"won":48,"drawn":39,"lost":65,"gf":193,"ga":232,"gd":-39,"points":183,"ppg":1.204,"titles":0,"top4":0,"relegations":0,"best_position":7},{"team":"Leeds","seasons":4,"played":152,"won":45,"drawn":40,"lost":67,"gf":201,"ga":267,"gd":-66,"points":175,"ppg":1.151,"titles":0,"top4":0,"relegations":2,"best_position":10},{"team":"Wigan","seasons":3,"played":114,"won":29,"drawn":34,"lost":51,"gf":129,"ga":196,"gd":-67,"points":121,"ppg":1.061,"titles":0,"top4":0,"relegations":2,"best_position":15},{"team":"Hull City","seasons":3,"played":114,"won":27,"drawn":25,"lost":62,"gf":108,"ga":184,"gd":-76,"points":106,"ppg":0.93,"titles":0,"top4":0,"relegations":2,"best_position":16},{"team":"Sheffield Utd","seasons":3,"played":114,"won":24,"drawn":21,"lost":69,"gf":94,"ga":206,"gd":-112,"points":93,"ppg":0.816,"titles":0,"top4":0,"relegations":2,"best_position":8},{"team":"QPR","seasons":3,"played":114,"won":22,"drawn":26,"lost":66,"gf":115,"ga":199,"gd":-84,"points":92,"ppg":0.807,"titles":0,"top4":0,"relegations":2,"best_position":17},{"team":"Bolton","seasons":2,"played":76,"won":22,"drawn":16,"lost":38,"gf":98,"ga":133,"gd":-35,"points":82,"ppg":1.079,"titles":0,"top4":0,"relegations":1,"best_position":10},{"team":"Blackburn","seasons":2,"played":76,"won":19,"drawn":17,"lost":40,"gf":94,"ga":137,"gd":-43,"points":74,"ppg":0.974,"titles":0,"top4":0,"relegations":1,"best_position":15},{"team":"Cardiff","seasons":2,"played":76,"won":17,"drawn":13,"lost":46,"gf":66,"ga":143,"gd":-77,"points":64,"ppg":0.842,"titles":0,"top4":0,"relegations":2,"best_position":18},{"team":"Huddersfield","seasons":2,"played":76,"won":12,"drawn":17,"lost":47,"gf":50,"ga":134,"gd":-84,"points":53,"ppg":0.697,"titles":0,"top4":0,"relegations":1,"best_position":16},{"team":"Blackpool","seasons":1,"played":38,"won":10,"drawn":9,"lost":19,"gf":55,"ga":78,"gd":-23,"points":39,"ppg":1.026,"titles":0,"top4":0,"relegations":1,"best_position":18},{"team":"Birmingham","seasons":1,"played":38,"won":8,"drawn":15,"lost":15,"gf":37,"ga":58,"gd":-21,"points":39,"ppg":1.026,"titles":0,"top4":0,"relegations":0,"best_position":17},{"team":"Reading","seasons":1,"played":38,"won":6,"drawn":10,"lost":22,"gf":43,"ga":73,"gd":-30,"points":28,"ppg":0.737,"titles":0,"top4":0,"relegations":1,"best_position":19},{"team":"Middlesbrough","seasons":1,"played":38,"won":5,"drawn":13,"lost":20,"gf":27,"ga":53,"gd":-26,"points":28,"ppg":0.737,"titles":0,"top4":0,"relegations":1,"best_position":19},{"team":"Luton","seasons":1,"played":38,"won":6,"drawn":8,"lost":24,"gf":52,"ga":85,"gd":-33,"points":26,"ppg":0.684,"titles":0,"top4":0,"relegations":1,"best_position":18},{"team":"Ipswich","seasons":1,"played":38,"won":4,"drawn":10,"lost":24,"gf":36,"ga":82,"gd":-46,"points":22,"ppg":0.579,"titles":0,"top4":0,"relegations":1,"best_position":19}],"team_style":[{"team":"Manchester City","matches_sampled":424,"avg_possession":64.83,"avg_shots":17.06,"avg_shots_on_target":6.25,"avg_corners":7.22,"avg_fouls":8.37,"pass_accuracy":88.6},{"team":"Liverpool","matches_sampled":411,"avg_possession":60.91,"avg_shots":16.9,"avg_shots_on_target":6.03,"avg_corners":6.65,"avg_fouls":9.38,"pass_accuracy":84.4},{"team":"Chelsea","matches_sampled":416,"avg_possession":58.88,"avg_shots":14.85,"avg_shots_on_target":5.28,"avg_corners":5.94,"avg_fouls":9.85,"pass_accuracy":86.0},{"team":"Arsenal","matches_sampled":414,"avg_possession":56.9,"avg_shots":14.24,"avg_shots_on_target":5.06,"avg_corners":5.92,"avg_fouls":9.41,"pass_accuracy":84.6},{"team":"Tottenham","matches_sampled":422,"avg_possession":55.65,"avg_shots":14.13,"avg_shots_on_target":5.27,"avg_corners":5.78,"avg_fouls":10.16,"pass_accuracy":83.4},{"team":"Manchester United","matches_sampled":415,"avg_possession":54.7,"avg_shots":14.12,"avg_shots_on_target":5.18,"avg_corners":5.44,"avg_fouls":10.38,"pass_accuracy":83.3},{"team":"Brighton","matches_sampled":338,"avg_possession":52.38,"avg_shots":12.91,"avg_shots_on_target":4.32,"avg_corners":5.06,"avg_fouls":11.16,"pass_accuracy":82.6},{"team":"Leeds","matches_sampled":152,"avg_possession":50.71,"avg_shots":12.81,"avg_shots_on_target":4.26,"avg_corners":5.04,"avg_fouls":11.62,"pass_accuracy":78.4},{"team":"Fulham","matches_sampled":227,"avg_possession":50.33,"avg_shots":12.41,"avg_shots_on_target":4.06,"avg_corners":4.87,"avg_fouls":11.15,"pass_accuracy":82.1},{"team":"Aston Villa","matches_sampled":306,"avg_possession":49.18,"avg_shots":12.3,"avg_shots_on_target":4.22,"avg_corners":5.29,"avg_fouls":9.67,"pass_accuracy":81.5},{"team":"Southampton","matches_sampled":343,"avg_possession":49.07,"avg_shots":12.13,"avg_shots_on_target":4.13,"avg_corners":5.15,"avg_fouls":10.36,"pass_accuracy":78.1},{"team":"Leicester","matches_sampled":343,"avg_possession":48.96,"avg_shots":12.04,"avg_shots_on_target":4.28,"avg_corners":4.99,"avg_fouls":9.43,"pass_accuracy":78.8},{"team":"Swansea","matches_sampled":120,"avg_possession":48.52,"avg_shots":10.43,"avg_shots_on_target":3.33,"avg_corners":4.46,"avg_fouls":7.4,"pass_accuracy":79.5},{"team":"Wolves","matches_sampled":302,"avg_possession":47.99,"avg_shots":11.33,"avg_shots_on_target":3.8,"avg_corners":4.53,"avg_fouls":11.58,"pass_accuracy":81.0},{"team":"Middlesbrough","matches_sampled":38,"avg_possession":47.18,"avg_shots":9.24,"avg_shots_on_target":2.63,"avg_corners":3.71,"avg_fouls":12.68,"pass_accuracy":77.3},{"team":"Bournemouth","matches_sampled":337,"avg_possession":47.11,"avg_shots":12.32,"avg_shots_on_target":4.21,"avg_corners":5.39,"avg_fouls":9.78,"pass_accuracy":78.6},{"team":"Huddersfield","matches_sampled":73,"avg_possession":46.88,"avg_shots":10.05,"avg_shots_on_target":2.97,"avg_corners":4.4,"avg_fouls":10.79,"pass_accuracy":75.1},{"team":"Norwich","matches_sampled":111,"avg_possession":45.92,"avg_shots":10.54,"avg_shots_on_target":3.23,"avg_corners":4.43,"avg_fouls":6.79,"pass_accuracy":77.6},{"team":"Everton","matches_sampled":415,"avg_possession":45.81,"avg_shots":11.77,"avg_shots_on_target":4.07,"avg_corners":4.74,"avg_fouls":10.41,"pass_accuracy":77.9},{"team":"Stoke City","matches_sampled":115,"avg_possession":45.75,"avg_shots":10.66,"avg_shots_on_target":3.44,"avg_corners":4.1,"avg_fouls":8.62,"pass_accuracy":75.3},{"team":"Brentford","matches_sampled":190,"avg_possession":45.66,"avg_shots":11.42,"avg_shots_on_target":4.32,"avg_corners":4.54,"avg_fouls":9.65,"pass_accuracy":77.1},{"team":"Newcastle","matches_sampled":379,"avg_possession":45.31,"avg_shots":12.36,"avg_shots_on_target":4.28,"avg_corners":4.99,"avg_fouls":9.53,"pass_accuracy":78.2},{"team":"Hull City","matches_sampled":46,"avg_possession":45.13,"avg_shots":10.45,"avg_shots_on_target":3.52,"avg_corners":4.52,"avg_fouls":11.09,"pass_accuracy":77.4},{"team":"West Ham","matches_sampled":420,"avg_possession":45.1,"avg_shots":11.92,"avg_shots_on_target":4.01,"avg_corners":4.81,"avg_fouls":9.32,"pass_accuracy":78.6},{"team":"Watford","matches_sampled":223,"avg_possession":45.04,"avg_shots":11.19,"avg_shots_on_target":3.56,"avg_corners":4.43,"avg_fouls":10.52,"pass_accuracy":74.2},{"team":"Crystal Palace","matches_sampled":418,"avg_possession":44.94,"avg_shots":11.62,"avg_shots_on_target":3.88,"avg_corners":4.84,"avg_fouls":10.29,"pass_accuracy":77.1},{"team":"Burnley","matches_sampled":310,"avg_possession":42.36,"avg_shots":10.17,"avg_shots_on_target":3.37,"avg_corners":4.32,"avg_fouls":10.43,"pass_accuracy":72.6},{"team":"Luton","matches_sampled":38,"avg_possession":42.08,"avg_shots":11.37,"avg_shots_on_target":3.71,"avg_corners":5.32,"avg_fouls":11.66,"pass_accuracy":76.1},{"team":"Sunderland","matches_sampled":117,"avg_possession":41.93,"avg_shots":10.77,"avg_shots_on_target":3.45,"avg_corners":3.97,"avg_fouls":8.07,"pass_accuracy":74.7},{"team":"Nottingham Forest","matches_sampled":152,"avg_possession":41.3,"avg_shots":11.57,"avg_shots_on_target":3.87,"avg_corners":4.16,"avg_fouls":11.11,"pass_accuracy":78.2},{"team":"Ipswich","matches_sampled":38,"avg_possession":40.29,"avg_shots":9.89,"avg_shots_on_target":3.34,"avg_corners":3.82,"avg_fouls":11.32,"pass_accuracy":80.4},{"team":"Sheffield Utd","matches_sampled":114,"avg_possession":39.9,"avg_shots":9.13,"avg_shots_on_target":3.0,"avg_corners":4.59,"avg_fouls":11.35,"pass_accuracy":74.6},{"team":"West Brom","matches_sampled":157,"avg_possession":38.59,"avg_shots":9.91,"avg_shots_on_target":3.0,"avg_corners":4.38,"avg_fouls":8.76,"pass_accuracy":71.0},{"team":"Cardiff","matches_sampled":37,"avg_possession":35.08,"avg_shots":11.03,"avg_shots_on_target":3.32,"avg_corners":4.43,"avg_fouls":9.76,"pass_accuracy":63.8}],"xg_performance":[{"team":"Arsenal","matches":132,"xg_for":238.79,"goals_for":274,"diff":35.21,"diff_per_game":0.267},{"team":"Luton","matches":38,"xg_for":43.35,"goals_for":52,"diff":8.65,"diff_per_game":0.228},{"team":"Manchester City","matches":134,"xg_for":265.33,"goals_for":293,"diff":27.67,"diff_per_game":0.206},{"team":"Tottenham","matches":132,"xg_for":195.66,"goals_for":218,"diff":22.34,"diff_per_game":0.169},{"team":"Aston Villa","matches":132,"xg_for":196.05,"goals_for":217,"diff":20.95,"diff_per_game":0.159},{"team":"Nottingham Forest","matches":133,"xg_for":161.09,"goals_for":178,"diff":16.91,"diff_per_game":0.127},{"team":"Sunderland","matches":38,"xg_for":38.58,"goals_for":42,"diff":3.42,"diff_per_game":0.09},{"team":"Fulham","matches":132,"xg_for":168.3,"goals_for":179,"diff":10.7,"diff_per_game":0.081},{"team":"Burnley","matches":76,"xg_for":73.41,"goals_for":79,"diff":5.59,"diff_per_game":0.074},{"team":"West Ham","matches":133,"xg_for":173.46,"goals_for":179,"diff":5.54,"diff_per_game":0.042},{"team":"Ipswich","matches":38,"xg_for":34.43,"goals_for":36,"diff":1.57,"diff_per_game":0.041},{"team":"Wolves","matches":133,"xg_for":146.5,"goals_for":150,"diff":3.5,"diff_per_game":0.026},{"team":"Newcastle","matches":132,"xg_for":238.33,"goals_for":240,"diff":1.67,"diff_per_game":0.013},{"team":"Liverpool","matches":133,"xg_for":273.73,"goals_for":274,"diff":0.27,"diff_per_game":0.002},{"team":"Brentford","matches":133,"xg_for":210.56,"goals_for":203,"diff":-7.56,"diff_per_game":-0.057},{"team":"Leicester","matches":57,"xg_for":61.77,"goals_for":58,"diff":-3.77,"diff_per_game":-0.066},{"team":"Brighton","matches":133,"xg_for":220.94,"goals_for":209,"diff":-11.94,"diff_per_game":-0.09},{"team":"Sheffield Utd","matches":38,"xg_for":39.05,"goals_for":35,"diff":-4.05,"diff_per_game":-0.107},{"team":"Leeds","matches":58,"xg_for":77.67,"goals_for":71,"diff":-6.67,"diff_per_game":-0.115},{"team":"Southampton","matches":57,"xg_for":52.23,"goals_for":45,"diff":-7.23,"diff_per_game":-0.127},{"team":"Manchester United","matches":132,"xg_for":213.68,"goals_for":196,"diff":-17.68,"diff_per_game":-0.134},{"team":"Crystal Palace","matches":134,"xg_for":191.23,"goals_for":172,"diff":-19.23,"diff_per_game":-0.144},{"team":"Bournemouth","matches":131,"xg_for":205.22,"goals_for":184,"diff":-21.22,"diff_per_game":-0.162},{"team":"Everton","matches":131,"xg_for":167.01,"goals_for":145,"diff":-22.01,"diff_per_game":-0.168},{"team":"Chelsea","matches":132,"xg_for":237.53,"goals_for":214,"diff":-23.53,"diff_per_game":-0.178}],"discipline":[{"team":"Ipswich","matches":36,"yellow":92,"red":4,"fouls_per_game":11.36,"cards_per_game":2.667,"trouble_score":2.778},{"team":"Sheffield Utd","matches":107,"yellow":237,"red":10,"fouls_per_game":11.4,"cards_per_game":2.308,"trouble_score":2.402},{"team":"Sunderland","matches":116,"yellow":252,"red":11,"fouls_per_game":8.09,"cards_per_game":2.267,"trouble_score":2.362},{"team":"Hull City","matches":43,"yellow":88,"red":6,"fouls_per_game":11.21,"cards_per_game":2.186,"trouble_score":2.326},{"team":"Watford","matches":212,"yellow":445,"red":22,"fouls_per_game":10.59,"cards_per_game":2.203,"trouble_score":2.307},{"team":"Fulham","matches":212,"yellow":457,"red":13,"fouls_per_game":11.3,"cards_per_game":2.217,"trouble_score":2.278},{"team":"Nottingham Forest","matches":148,"yellow":316,"red":6,"fouls_per_game":11.17,"cards_per_game":2.176,"trouble_score":2.216},{"team":"Leeds","matches":151,"yellow":315,"red":8,"fouls_per_game":11.64,"cards_per_game":2.139,"trouble_score":2.192},{"team":"Aston Villa","matches":298,"yellow":604,"red":19,"fouls_per_game":9.8,"cards_per_game":2.091,"trouble_score":2.154},{"team":"Wolves","matches":294,"yellow":589,"red":20,"fouls_per_game":11.63,"cards_per_game":2.071,"trouble_score":2.139},{"team":"Chelsea","matches":397,"yellow":789,"red":29,"fouls_per_game":9.88,"cards_per_game":2.06,"trouble_score":2.134},{"team":"Middlesbrough","matches":38,"yellow":79,"red":1,"fouls_per_game":12.68,"cards_per_game":2.105,"trouble_score":2.132},{"team":"Everton","matches":396,"yellow":770,"red":36,"fouls_per_game":10.47,"cards_per_game":2.035,"trouble_score":2.126},{"team":"Manchester United","matches":398,"yellow":802,"red":21,"fouls_per_game":10.44,"cards_per_game":2.068,"trouble_score":2.121},{"team":"Tottenham","matches":407,"yellow":805,"red":22,"fouls_per_game":10.18,"cards_per_game":2.032,"trouble_score":2.086},{"team":"West Brom","matches":144,"yellow":283,"red":7,"fouls_per_game":9.03,"cards_per_game":2.014,"trouble_score":2.062},{"team":"Cardiff","matches":32,"yellow":64,"red":1,"fouls_per_game":10.0,"cards_per_game":2.031,"trouble_score":2.062},{"team":"Crystal Palace","matches":400,"yellow":769,"red":20,"fouls_per_game":10.36,"cards_per_game":1.972,"trouble_score":2.022},{"team":"Burnley","matches":285,"yellow":545,"red":14,"fouls_per_game":10.48,"cards_per_game":1.961,"trouble_score":2.011},{"team":"Southampton","matches":324,"yellow":602,"red":24,"fouls_per_game":10.52,"cards_per_game":1.932,"trouble_score":2.006},{"team":"Bournemouth","matches":330,"yellow":628,"red":17,"fouls_per_game":9.84,"cards_per_game":1.955,"trouble_score":2.006},{"team":"Brentford","matches":178,"yellow":342,"red":7,"fouls_per_game":9.71,"cards_per_game":1.961,"trouble_score":2.0},{"team":"Brighton","matches":324,"yellow":602,"red":22,"fouls_per_game":11.19,"cards_per_game":1.926,"trouble_score":1.994},{"team":"Huddersfield","matches":68,"yellow":121,"red":7,"fouls_per_game":10.96,"cards_per_game":1.882,"trouble_score":1.985},{"team":"Newcastle","matches":360,"yellow":664,"red":23,"fouls_per_game":9.63,"cards_per_game":1.908,"trouble_score":1.972},{"team":"West Ham","matches":403,"yellow":719,"red":29,"fouls_per_game":9.43,"cards_per_game":1.856,"trouble_score":1.928},{"team":"Luton","matches":37,"yellow":71,"red":0,"fouls_per_game":11.78,"cards_per_game":1.919,"trouble_score":1.919},{"team":"Stoke City","matches":108,"yellow":192,"red":7,"fouls_per_game":8.68,"cards_per_game":1.843,"trouble_score":1.907},{"team":"Arsenal","matches":395,"yellow":677,"red":33,"fouls_per_game":9.5,"cards_per_game":1.797,"trouble_score":1.881},{"team":"Norwich","matches":101,"yellow":180,"red":4,"fouls_per_game":6.82,"cards_per_game":1.822,"trouble_score":1.861},{"team":"Leicester","matches":321,"yellow":555,"red":21,"fouls_per_game":9.51,"cards_per_game":1.794,"trouble_score":1.86},{"team":"Manchester City","matches":397,"yellow":629,"red":19,"fouls_per_game":8.4,"cards_per_game":1.632,"trouble_score":1.68},{"team":"Liverpool","matches":374,"yellow":580,"red":17,"fouls_per_game":9.55,"cards_per_game":1.596,"trouble_score":1.642},{"team":"Swansea","matches":109,"yellow":169,"red":3,"fouls_per_game":7.28,"cards_per_game":1.578,"trouble_score":1.606}],"importance":{"top_matches":[{"season":"2025/26","date":"2026-05-15","home":"Aston Villa","away":"Liverpool","score":"4-2","importance":0.968,"is_derby":false,"title_component":0.0,"europe_component":1.0,"relegation_component":0.0},{"season":"2024/25","date":"2025-05-11","home":"Newcastle","away":"Chelsea","score":"2-0","importance":0.953,"is_derby":false,"title_component":0.0,"europe_component":1.0,"relegation_component":0.0},{"season":"2013/14","date":"2014-04-13","home":"Liverpool","away":"Manchester City","score":"3-2","importance":0.921,"is_derby":false,"title_component":1.0,"europe_component":0.3,"relegation_component":0.0},{"season":"2020/21","date":"2021-04-24","home":"West Ham","away":"Chelsea","score":"0-1","importance":0.905,"is_derby":false,"title_component":0.0,"europe_component":1.0,"relegation_component":0.0},{"season":"2015/16","date":"2016-04-16","home":"Norwich","away":"Sunderland","score":"0-3","importance":0.89,"is_derby":false,"title_component":0.0,"europe_component":0.0,"relegation_component":0.97},{"season":"2015/16","date":"2016-03-20","home":"Manchester City","away":"Manchester United","score":"0-1","importance":0.887,"is_derby":true,"title_component":0.5,"europe_component":0.96,"relegation_component":0.01},{"season":"2022/23","date":"2023-04-25","home":"Leeds","away":"Leicester","score":"1-1","importance":0.88,"is_derby":false,"title_component":0.0,"europe_component":0.0,"relegation_component":0.97},{"season":"2022/23","date":"2023-04-26","home":"Manchester City","away":"Arsenal","score":"4-1","importance":0.88,"is_derby":false,"title_component":0.97,"europe_component":0.06,"relegation_component":0.0},{"season":"2014/15","date":"2015-03-22","home":"Liverpool","away":"Manchester United","score":"1-2","importance":0.876,"is_derby":true,"title_component":0.56,"europe_component":0.96,"relegation_component":0.0},{"season":"2025/26","date":"2026-05-03","home":"Manchester United","away":"Liverpool","score":"3-2","importance":0.87,"is_derby":true,"title_component":0.0,"europe_component":0.88,"relegation_component":0.0},{"season":"2015/16","date":"2016-03-20","home":"Newcastle","away":"Sunderland","score":"1-1","importance":0.869,"is_derby":true,"title_component":0.0,"europe_component":0.0,"relegation_component":0.94},{"season":"2017/18","date":"2018-03-31","home":"West Ham","away":"Southampton","score":"3-0","importance":0.868,"is_derby":false,"title_component":0.0,"europe_component":0.0,"relegation_component":0.98},{"season":"2021/22","date":"2022-04-10","home":"Manchester City","away":"Liverpool","score":"2-2","importance":0.868,"is_derby":false,"title_component":0.98,"europe_component":0.12,"relegation_component":0.0},{"season":"2011/12","date":"2012-05-02","home":"Chelsea","away":"Newcastle","score":"0-2","importance":0.86,"is_derby":false,"title_component":0.0,"europe_component":0.93,"relegation_component":0.0},{"season":"2022/23","date":"2023-05-01","home":"Leicester","away":"Everton","score":"2-2","importance":0.86,"is_derby":false,"title_component":0.0,"europe_component":0.0,"relegation_component":0.93}],"derby_count":226,"total_matches":6080,"avg_importance":0.5216,"top_derby_fixtures":[{"pair":"Manchester City vs Manchester United","meetings":32},{"pair":"Liverpool vs Manchester United","meetings":32},{"pair":"Chelsea vs Tottenham","meetings":32},{"pair":"Arsenal vs Tottenham","meetings":32},{"pair":"Arsenal vs Chelsea","meetings":32},{"pair":"Everton vs Liverpool","meetings":32},{"pair":"Brighton vs Crystal Palace","meetings":18},{"pair":"Newcastle vs Sunderland","meetings":14},{"pair":"Aston Villa vs Birmingham","meetings":2}]},"promising":{"points_trend":[{"team":"Brentford","points_latest":52,"points_earlier":39,"delta":13,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Manchester United","points_latest":68,"points_earlier":57,"delta":11,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Nottingham Forest","points_latest":43,"points_earlier":33,"delta":10,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Bournemouth","points_latest":56,"points_earlier":48,"delta":8,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Fulham","points_latest":49,"points_earlier":44,"delta":5,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Brighton","points_latest":53,"points_earlier":48,"delta":5,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Everton","points_latest":49,"points_earlier":48,"delta":1,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Crystal Palace","points_latest":45,"points_earlier":46,"delta":-1,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Burnley","points_latest":21,"points_earlier":24,"delta":-3,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Arsenal","points_latest":82,"points_earlier":86,"delta":-4,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Aston Villa","points_latest":62,"points_earlier":68,"delta":-6,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Newcastle","points_latest":49,"points_earlier":57,"delta":-8,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Chelsea","points_latest":52,"points_earlier":60,"delta":-8,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Manchester City","points_latest":78,"points_earlier":88,"delta":-10,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"West Ham","points_latest":36,"points_earlier":52,"delta":-16,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Liverpool","points_latest":59,"points_earlier":79,"delta":-20,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Tottenham","points_latest":38,"points_earlier":63,"delta":-25,"latest_season":"2025/26","earlier_season":"2023/24"},{"team":"Wolves","points_latest":19,"points_earlier":46,"delta":-27,"latest_season":"2025/26","earlier_season":"2023/24"}],"latest_season":"2025/26","earlier_season":"2023/24"},"shot_efficiency":[{"team":"Manchester City","matches":415,"shots_per_game":17.06,"conversion_pct":13.67,"sot_pct":36.54,"goals_per_game":2.33},{"team":"Arsenal","matches":407,"shots_per_game":14.24,"conversion_pct":13.06,"sot_pct":35.47,"goals_per_game":1.86},{"team":"Brentford","matches":190,"shots_per_game":11.42,"conversion_pct":13.05,"sot_pct":37.81,"goals_per_game":1.49},{"team":"Tottenham","matches":412,"shots_per_game":14.13,"conversion_pct":12.69,"sot_pct":37.07,"goals_per_game":1.79},{"team":"Liverpool","matches":403,"shots_per_game":16.9,"conversion_pct":12.36,"sot_pct":35.57,"goals_per_game":2.09},{"team":"Leicester","matches":334,"shots_per_game":12.04,"conversion_pct":12.28,"sot_pct":35.55,"goals_per_game":1.48},{"team":"Luton","matches":38,"shots_per_game":11.37,"conversion_pct":12.04,"sot_pct":32.64,"goals_per_game":1.37},{"team":"West Ham","matches":413,"shots_per_game":11.92,"conversion_pct":11.59,"sot_pct":33.73,"goals_per_game":1.38},{"team":"Chelsea","matches":411,"shots_per_game":14.85,"conversion_pct":11.44,"sot_pct":35.33,"goals_per_game":1.7},{"team":"Newcastle","matches":370,"shots_per_game":12.36,"conversion_pct":11.31,"sot_pct":34.78,"goals_per_game":1.4},{"team":"Aston Villa","matches":298,"shots_per_game":12.3,"conversion_pct":11.21,"sot_pct":34.35,"goals_per_game":1.38},{"team":"Manchester United","matches":407,"shots_per_game":14.12,"conversion_pct":11.06,"sot_pct":36.78,"goals_per_game":1.56},{"team":"Nottingham Forest","matches":152,"shots_per_game":11.57,"conversion_pct":10.98,"sot_pct":33.45,"goals_per_game":1.27},{"team":"Bournemouth","matches":337,"shots_per_game":12.32,"conversion_pct":10.59,"sot_pct":34.17,"goals_per_game":1.31},{"team":"Everton","matches":406,"shots_per_game":11.77,"conversion_pct":10.42,"sot_pct":34.52,"goals_per_game":1.23},{"team":"Leeds","matches":152,"shots_per_game":12.81,"conversion_pct":10.32,"sot_pct":33.28,"goals_per_game":1.32},{"team":"Crystal Palace","matches":409,"shots_per_game":11.62,"conversion_pct":10.25,"sot_pct":33.42,"goals_per_game":1.19},{"team":"Burnley","matches":302,"shots_per_game":10.17,"conversion_pct":10.03,"sot_pct":32.78,"goals_per_game":1.02},{"team":"Brighton","matches":338,"shots_per_game":12.91,"conversion_pct":9.88,"sot_pct":33.43,"goals_per_game":1.28},{"team":"Stoke City","matches":108,"shots_per_game":10.66,"conversion_pct":9.82,"sot_pct":32.58,"goals_per_game":1.05},{"team":"Sunderland","matches":108,"shots_per_game":10.77,"conversion_pct":9.8,"sot_pct":32.24,"goals_per_game":1.06},{"team":"Wolves","matches":302,"shots_per_game":11.33,"conversion_pct":9.64,"sot_pct":33.55,"goals_per_game":1.09},{"team":"Fulham","matches":227,"shots_per_game":12.41,"conversion_pct":9.58,"sot_pct":32.69,"goals_per_game":1.19},{"team":"Ipswich","matches":38,"shots_per_game":9.89,"conversion_pct":9.57,"sot_pct":33.78,"goals_per_game":0.95},{"team":"Watford","matches":223,"shots_per_game":11.19,"conversion_pct":9.5,"sot_pct":31.81,"goals_per_game":1.06},{"team":"West Brom","matches":149,"shots_per_game":9.91,"conversion_pct":9.48,"sot_pct":30.13,"goals_per_game":0.94},{"team":"Swansea","matches":111,"shots_per_game":10.43,"conversion_pct":9.41,"sot_pct":32.04,"goals_per_game":0.98},{"team":"Hull City","matches":38,"shots_per_game":10.45,"conversion_pct":9.32,"sot_pct":31.74,"goals_per_game":0.97},{"team":"Southampton","matches":335,"shots_per_game":12.13,"conversion_pct":9.25,"sot_pct":34.12,"goals_per_game":1.12},{"team":"Sheffield Utd","matches":114,"shots_per_game":9.13,"conversion_pct":9.03,"sot_pct":32.85,"goals_per_game":0.82},{"team":"Cardiff","matches":37,"shots_per_game":11.03,"conversion_pct":8.09,"sot_pct":30.15,"goals_per_game":0.89},{"team":"Middlesbrough","matches":38,"shots_per_game":9.24,"conversion_pct":7.69,"sot_pct":28.49,"goals_per_game":0.71},{"team":"Norwich","matches":111,"shots_per_game":10.54,"conversion_pct":7.52,"sot_pct":30.68,"goals_per_game":0.79},{"team":"Huddersfield","matches":73,"shots_per_game":10.05,"conversion_pct":6.54,"sot_pct":29.56,"goals_per_game":0.66}],"spotlights":[{"title":"Home advantage is shifting","detail":"Home win rate has fallen from 47.1% in 2010/11 to 42.6% in 2025/26 (-4.5 pts)."},{"title":"Manchester City lead the era","detail":"8 titles, 1334 points and a +839 goal difference across 16 seasons in the data."},{"title":"Manchester City: best points-per-game","detail":"2.194 points per game across 608 matches -- the highest sustained rate in the dataset."},{"title":"Arsenal: most clinical finishing","detail":"Scored +35.2 goals above their expected-goals total (274 goals from 238.8 xG) since 2022/23."},{"title":"Chelsea: underperforming their chances","detail":"-23.5 goals below expected-goals (214 from 237.5 xG) -- due a positive correction if their process holds."},{"title":"Brentford: team on the rise","detail":"+13 points from 2023/24 to 2025/26 (39 -> 52) -- the biggest improvement in the league."},{"title":"Swansea: cleanest disciplinary record","detail":"Just 1.58 cards per game across 109 sampled matches."},{"title":"Manchester City: sharpest shooters","detail":"Converts 13.7% of shots into goals (2.33 goals/game from 17.1 shots/game)."}]};
+</script>
+<script>
+(function () {
+  "use strict";
+
+  const cssVar = (name) => getComputedStyle(document.body).getPropertyValue(name).trim();
+  const tooltip = document.getElementById("tooltip");
+
+  function showTooltip(evt, html) {
+    tooltip.innerHTML = html;
+    tooltip.classList.add("show");
+    moveTooltip(evt);
+  }
+  function moveTooltip(evt) {
+    const x = evt.clientX, y = evt.clientY;
+    tooltip.style.left = x + "px";
+    tooltip.style.top = (y - 10) + "px";
+  }
+  function hideTooltip() { tooltip.classList.remove("show"); }
+
+  function fmt(n, digits) {
+    if (n === null || n === undefined || Number.isNaN(n)) return "-";
+    if (digits === undefined) digits = 0;
+    return Number(n).toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  }
+  function pct(n, digits) {
+    if (n === null || n === undefined) return "-";
+    return (n * 100).toFixed(digits === undefined ? 1 : digits) + "%";
+  }
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+  // ---------- horizontal bar list (sequential, single hue) ----------
+  function hBarList(container, data, opts) {
+    opts = opts || {};
+    const valueKey = opts.valueKey, labelKey = opts.labelKey || "team";
+    const fmtValue = opts.fmtValue || (v => fmt(v, 1));
+    const max = Math.max(...data.map(d => Math.abs(d[valueKey])), 1e-9);
+    const wrap = document.createElement("div");
+    wrap.className = "barlist";
+    data.forEach((d) => {
+      const row = document.createElement("div");
+      row.className = "row" + (opts.highlight && opts.highlight(d) ? " highlight" : "");
+      const pctW = Math.max(2, Math.round((Math.abs(d[valueKey]) / max) * 100));
+      row.innerHTML = `
+        <div class="name" title="${esc(d[labelKey])}">${esc(d[labelKey])}</div>
+        <div class="track"><div class="fill${opts.alt ? ' alt' : ''}" style="width:${pctW}%"></div></div>
+        <div class="val">${esc(fmtValue(d[valueKey]))}</div>`;
+      const track = row.querySelector(".track");
+      track.addEventListener("mousemove", (e) => showTooltip(e, opts.tooltip ? opts.tooltip(d) : `<b>${esc(d[labelKey])}</b><br>${esc(fmtValue(d[valueKey]))}`));
+      track.addEventListener("mouseleave", hideTooltip);
+      wrap.appendChild(row);
+    });
+    container.innerHTML = "";
+    container.appendChild(wrap);
+  }
+
+  // ---------- diverging bar list ----------
+  function divBarList(container, data, opts) {
+    opts = opts || {};
+    const valueKey = opts.valueKey, labelKey = opts.labelKey || "team";
+    const fmtValue = opts.fmtValue || (v => (v > 0 ? "+" : "") + fmt(v, 2));
+    const max = Math.max(...data.map(d => Math.abs(d[valueKey])), 1e-9);
+    const wrap = document.createElement("div");
+    wrap.className = "divlist barlist";
+    data.forEach((d) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      const v = d[valueKey];
+      const pctW = Math.max(1, Math.round((Math.abs(v) / max) * 50));
+      const cls = v >= 0 ? "pos" : "neg";
+      const style = v >= 0 ? `width:${pctW}%` : `width:${pctW}%`;
+      row.innerHTML = `
+        <div class="name" title="${esc(d[labelKey])}">${esc(d[labelKey])}</div>
+        <div class="track"><div class="fill ${cls}" style="${style}"></div></div>
+        <div class="val" style="color:${v >= 0 ? 'var(--good-text)' : 'var(--div-neg)'}">${esc(fmtValue(v))}</div>`;
+      const track = row.querySelector(".track");
+      track.addEventListener("mousemove", (e) => showTooltip(e, opts.tooltip ? opts.tooltip(d) : `<b>${esc(d[labelKey])}</b><br>${esc(fmtValue(v))}`));
+      track.addEventListener("mouseleave", hideTooltip);
+      wrap.appendChild(row);
+    });
+    container.innerHTML = "";
+    container.appendChild(wrap);
+  }
+
+  // ---------- line chart (single or multi series) ----------
+  function lineChart(container, categories, series, opts) {
+    opts = opts || {};
+    const W = 640, H = 240, padL = 40, padR = 16, padT = 16, padB = 28;
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    const allVals = series.flatMap(s => s.values.filter(v => v !== null && v !== undefined));
+    let minV = opts.min !== undefined ? opts.min : Math.min(0, ...allVals);
+    let maxV = opts.max !== undefined ? opts.max : Math.max(...allVals);
+    if (maxV === minV) maxV = minV + 1;
+    const pad = (maxV - minV) * 0.1;
+    maxV += pad;
+    const n = categories.length;
+    const x = i => padL + (n <= 1 ? 0 : (i / (n - 1)) * innerW);
+    const y = v => padT + innerH - ((v - minV) / (maxV - minV)) * innerH;
+
+    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, role: "img" });
+
+    const ticks = 4;
+    for (let t = 0; t <= ticks; t++) {
+      const v = minV + ((maxV - minV) * t) / ticks;
+      const yy = y(v);
+      svg.appendChild(svgEl("line", { class: "grid-line", x1: padL, x2: W - padR, y1: yy, y2: yy }));
+      const txt = svgEl("text", { class: "axis-text", x: 4, y: yy + 3 });
+      txt.textContent = opts.yFmt ? opts.yFmt(v) : fmt(v, 1);
+      svg.appendChild(txt);
+    }
+    const step = Math.max(1, Math.round(n / 8));
+    categories.forEach((c, i) => {
+      if (i % step !== 0 && i !== n - 1) return;
+      const txt = svgEl("text", { class: "axis-text", x: x(i), y: H - 6, "text-anchor": "middle" });
+      txt.textContent = c;
+      svg.appendChild(txt);
+    });
+    svg.appendChild(svgEl("line", { class: "baseline", x1: padL, x2: W - padR, y1: padT + innerH, y2: padT + innerH }));
+
+    series.forEach((s) => {
+      const pts = s.values.map((v, i) => [x(i), v === null || v === undefined ? null : y(v)]).filter(p => p[1] !== null);
+      const d = pts.map((p, i) => (i === 0 ? "M" : "L") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+      svg.appendChild(svgEl("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      pts.forEach(([px, py], i) => {
+        const dot = svgEl("circle", { class: "mark-dot", cx: px, cy: py, r: 4, fill: s.color });
+        dot.addEventListener("mousemove", (e) => showTooltip(e, `<b>${esc(categories[i])}</b><br>${esc(s.name)}: ${esc(opts.tipFmt ? opts.tipFmt(s.values[i]) : fmt(s.values[i], 2))}`));
+        dot.addEventListener("mouseleave", hideTooltip);
+        svg.appendChild(dot);
+      });
+      if (opts.endLabel) {
+        const last = pts[pts.length - 1];
+        if (last) {
+          const txt = svgEl("text", { class: "direct-label", x: last[0] - 4, y: last[1] - 8, "text-anchor": "end" });
+          txt.textContent = opts.tipFmt ? opts.tipFmt(s.values[s.values.length - 1]) : fmt(s.values[s.values.length - 1], 2);
+          svg.appendChild(txt);
+        }
+      }
+    });
+
+    container.innerHTML = "";
+    if (series.length > 1) {
+      const legend = document.createElement("div");
+      legend.className = "legend";
+      legend.innerHTML = series.map(s => `<span class="key"><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}</span>`).join("");
+      container.appendChild(legend);
+    }
+    container.appendChild(svg);
+  }
+
+  // ---------- 100% stacked column chart ----------
+  function stackedColumnChart(container, categories, series, opts) {
+    opts = opts || {};
+    const W = 640, H = 260, padL = 34, padR = 16, padT = 16, padB = 28;
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    const n = categories.length;
+    const bw = Math.min(24, (innerW / n) * 0.7);
+    const gap = 2;
+    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}` });
+
+    [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+      const yy = padT + innerH - f * innerH;
+      svg.appendChild(svgEl("line", { class: "grid-line", x1: padL, x2: W - padR, y1: yy, y2: yy }));
+      const txt = svgEl("text", { class: "axis-text", x: 2, y: yy + 3 });
+      txt.textContent = Math.round(f * 100) + "%";
+      svg.appendChild(txt);
+    });
+
+    const step = Math.max(1, Math.round(n / 8));
+    categories.forEach((c, i) => {
+      const cx = padL + (i + 0.5) * (innerW / n);
+      let acc = 0;
+      series.forEach((s) => {
+        const v = s.values[i];
+        const h0 = padT + innerH - acc * innerH;
+        const h1 = padT + innerH - (acc + v) * innerH;
+        const segH = Math.max(0, h0 - h1 - gap);
+        const rect = svgEl("rect", { x: cx - bw / 2, y: h1, width: bw, height: segH, fill: s.color, rx: 1 });
+        rect.addEventListener("mousemove", (e) => showTooltip(e, `<b>${esc(categories[i])}</b><br>${esc(s.name)}: ${pct(v, 1)}`));
+        rect.addEventListener("mouseleave", hideTooltip);
+        svg.appendChild(rect);
+        acc += v;
+      });
+      if (i % step === 0 || i === n - 1) {
+        const txt = svgEl("text", { class: "axis-text", x: cx, y: H - 6, "text-anchor": "middle" });
+        txt.textContent = c;
+        svg.appendChild(txt);
+      }
+    });
+    svg.appendChild(svgEl("line", { class: "baseline", x1: padL, x2: W - padR, y1: padT + innerH, y2: padT + innerH }));
+
+    container.innerHTML = "";
+    const legend = document.createElement("div");
+    legend.className = "legend";
+    legend.innerHTML = series.map(s => `<span class="key"><span class="swatch" style="background:${s.color}"></span>${esc(s.name)}</span>`).join("");
+    container.appendChild(legend);
+    container.appendChild(svg);
+  }
+
+  // ---------- scatter chart ----------
+  function scatterChart(container, points, opts) {
+    opts = opts || {};
+    const W = 900, H = 420, padL = 64, padR = 20, padT = 16, padB = 44;
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    const xs = points.map(p => p.x), ys = points.map(p => p.y);
+    const xMin = Math.min(...xs) * 0.95, xMax = Math.max(...xs) * 1.05;
+    const yMin = Math.min(...ys) * 0.9, yMax = Math.max(...ys) * 1.08;
+    const x = v => padL + ((v - xMin) / (xMax - xMin)) * innerW;
+    const y = v => padT + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
+
+    const svg = svgEl("svg", { class: "chart", viewBox: `0 0 ${W} ${H}` });
+    for (let t = 0; t <= 4; t++) {
+      const yy = padT + (innerH * t) / 4;
+      svg.appendChild(svgEl("line", { class: "grid-line", x1: padL, x2: W - padR, y1: yy, y2: yy }));
+      const v = yMax - ((yMax - yMin) * t) / 4;
+      const txt = svgEl("text", { class: "axis-text", x: padL - 8, y: yy + 3, "text-anchor": "end" });
+      txt.textContent = fmt(v, 1);
+      svg.appendChild(txt);
+    }
+    for (let t = 0; t <= 4; t++) {
+      const xx = padL + (innerW * t) / 4;
+      const v = xMin + ((xMax - xMin) * t) / 4;
+      const txt = svgEl("text", { class: "axis-text", x: xx, y: padT + innerH + 16, "text-anchor": "middle" });
+      txt.textContent = fmt(v, 1);
+      svg.appendChild(txt);
+    }
+    const xLabel = svgEl("text", { class: "axis-text", x: padL + innerW / 2, y: padT + innerH + 36, "text-anchor": "middle" });
+    xLabel.textContent = opts.xLabel || "";
+    svg.appendChild(xLabel);
+    const yLabelX = 14, yLabelY = padT + innerH / 2;
+    const yLabel = svgEl("text", {
+      class: "axis-text", x: yLabelX, y: yLabelY, "text-anchor": "middle",
+      transform: `rotate(-90, ${yLabelX}, ${yLabelY})`,
+    });
+    yLabel.textContent = opts.yLabel || "";
+    svg.appendChild(yLabel);
+
+    const sorted = [...points].sort((a, b) => b.y - a.y);
+    const labelSet = new Set([sorted[0]?.label, sorted[sorted.length - 1]?.label, [...points].sort((a,b)=>b.x-a.x)[0]?.label]);
+
+    points.forEach((p) => {
+      const cx = x(p.x), cy = y(p.y);
+      const dot = svgEl("circle", { class: "mark-dot", cx, cy, r: 6, fill: "var(--series-1)" });
+      dot.addEventListener("mousemove", (e) => showTooltip(e, `<b>${esc(p.label)}</b><br>${esc(opts.xLabel)}: ${fmt(p.x, 2)}<br>${esc(opts.yLabel)}: ${fmt(p.y, 2)}`));
+      dot.addEventListener("mouseleave", hideTooltip);
+      svg.appendChild(dot);
+      if (labelSet.has(p.label)) {
+        const txt = svgEl("text", { class: "direct-label", x: cx + 8, y: cy - 8 });
+        txt.textContent = p.label;
+        svg.appendChild(txt);
+      }
+    });
+
+    container.innerHTML = "";
+    container.appendChild(svg);
+  }
+
+  // ---------- generic sortable/searchable table ----------
+  function renderTable(tableEl, columns, rows, opts) {
+    opts = opts || {};
+    let sortKey = opts.defaultSort || columns[0].key;
+    let sortDir = opts.defaultDir || "desc";
+
+    function draw() {
+      const sorted = [...rows].sort((a, b) => {
+        const av = a[sortKey], bv = b[sortKey];
+        let cmp;
+        if (typeof av === "string") cmp = av.localeCompare(bv);
+        else cmp = (av ?? -Infinity) - (bv ?? -Infinity);
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+      const thead = `<thead><tr>${columns.map(c => `<th data-key="${c.key}" class="${c.num ? "num" : ""} ${sortKey === c.key ? (sortDir === "asc" ? "sort-asc" : "sort-desc") : ""}">${esc(c.label)}</th>`).join("")}</tr></thead>`;
+      const tbody = `<tbody>${sorted.map(r => `<tr>${columns.map(c => `<td class="${c.num ? "num" : ""}">${c.fmt ? c.fmt(r[c.key], r) : esc(r[c.key])}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      tableEl.innerHTML = thead + tbody;
+      tableEl.querySelectorAll("th").forEach((th) => {
+        th.addEventListener("click", () => {
+          const key = th.getAttribute("data-key");
+          if (sortKey === key) sortDir = sortDir === "asc" ? "desc" : "asc";
+          else { sortKey = key; sortDir = "desc"; }
+          draw();
+        });
+      });
+    }
+    draw();
+    return { redraw: (newRows) => { rows = newRows; draw(); } };
+  }
+
+  // ================= build the page =================
+
+  function init() {
+    const meta = DATA.meta;
+    document.getElementById("hero-sub").textContent =
+      `${meta.league} • ${meta.first_season}–${meta.last_season} • ${meta.season_count} seasons • ${meta.fixture_count.toLocaleString()} fixtures • ${meta.team_count} teams`;
+
+    const kpis = [
+      { label: "Seasons tracked", value: meta.season_count },
+      { label: "Fixtures", value: meta.fixture_count.toLocaleString() },
+      { label: "Total goals", value: meta.total_goals.toLocaleString() },
+      { label: "Goals / game", value: fmt(meta.avg_goals_per_game, 2) },
+      { label: "Teams tracked", value: meta.team_count },
+      { label: "Latest champion", value: DATA.season_trends[DATA.season_trends.length - 1].champion },
+    ];
+    document.getElementById("kpi-row").innerHTML = kpis.map(k => `<div class="kpi"><p class="label">${esc(k.label)}</p><p class="value">${esc(k.value)}</p></div>`).join("");
+
+    document.getElementById("spot-grid").innerHTML = DATA.spotlights.map(s => `<div class="spot"><h3>${esc(s.title)}</h3><p>${esc(s.detail)}</p></div>`).join("");
+
+    // ---- season trends ----
+    const st = DATA.season_trends;
+    const categories = st.map(s => s.season);
+    lineChart(document.getElementById("chart-goals"), categories, [
+      { name: "Goals / game", color: "var(--series-1)", values: st.map(s => s.avg_goals_per_game) },
+    ], { tipFmt: v => fmt(v, 2), endLabel: true });
+
+    stackedColumnChart(document.getElementById("chart-outcomes"), categories, [
+      { name: "Home win", color: "var(--series-1)", values: st.map(s => s.home_win_pct) },
+      { name: "Draw", color: "var(--series-2)", values: st.map(s => s.draw_pct) },
+      { name: "Away win", color: "var(--series-3)", values: st.map(s => s.away_win_pct) },
+    ]);
+
+    const cardSeasons = st.filter(s => s.avg_cards_per_team !== null);
+    lineChart(document.getElementById("chart-cards"), cardSeasons.map(s => s.season), [
+      { name: "Cards / team / game", color: "var(--series-1)", values: cardSeasons.map(s => s.avg_cards_per_team) },
+    ], { tipFmt: v => fmt(v, 2), endLabel: true });
+
+    const xgSeasons = st.filter(s => s.avg_xg_per_team !== null);
+    if (xgSeasons.length) {
+      lineChart(document.getElementById("chart-xg-season"), xgSeasons.map(s => s.season), [
+        { name: "xG / team / game", color: "var(--series-1)", values: xgSeasons.map(s => s.avg_xg_per_team) },
+      ], { tipFmt: v => fmt(v, 2), endLabel: true });
+    } else {
+      document.getElementById("chart-xg-season").innerHTML = '<p class="hint">No xG data available yet.</p>';
+    }
+
+    addTableToggle("chart-goals", ["Season", "Goals/game"], st.map(s => [s.season, fmt(s.avg_goals_per_game, 2)]));
+    addTableToggle("chart-outcomes", ["Season", "Home win", "Draw", "Away win"], st.map(s => [s.season, pct(s.home_win_pct), pct(s.draw_pct), pct(s.away_win_pct)]));
+
+    // ---- all-time team table ----
+    const teamColumns = [
+      { key: "team", label: "Team" },
+      { key: "seasons", label: "Seasons", num: true },
+      { key: "played", label: "Played", num: true },
+      { key: "won", label: "W", num: true },
+      { key: "drawn", label: "D", num: true },
+      { key: "lost", label: "L", num: true },
+      { key: "gf", label: "GF", num: true },
+      { key: "ga", label: "GA", num: true },
+      { key: "gd", label: "GD", num: true, fmt: v => (v > 0 ? "+" : "") + v },
+      { key: "points", label: "Pts", num: true },
+      { key: "ppg", label: "PPG", num: true, fmt: v => fmt(v, 2) },
+      { key: "titles", label: "Titles", num: true },
+      { key: "top4", label: "Top 4", num: true },
+      { key: "best_position", label: "Best pos.", num: true },
+    ];
+    const teamTableEl = document.getElementById("team-table");
+    const teamTableApi = renderTable(teamTableEl, teamColumns, DATA.team_table, { defaultSort: "points", defaultDir: "desc" });
+    document.getElementById("team-search").addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      teamTableApi.redraw(DATA.team_table.filter(r => r.team.toLowerCase().includes(q)));
+    });
+
+    // ---- leaderboards ----
+    const byPoints = [...DATA.team_table].sort((a, b) => b.points - a.points).slice(0, 12);
+    hBarList(document.getElementById("chart-points"), byPoints, { valueKey: "points", fmtValue: v => fmt(v, 0) });
+
+    const byGoals = [...DATA.team_table].sort((a, b) => b.gf - a.gf).slice(0, 12);
+    hBarList(document.getElementById("chart-goals-total"), byGoals, { valueKey: "gf", fmtValue: v => fmt(v, 0) });
+
+    const byPpg = [...DATA.team_table].filter(t => t.seasons >= 3).sort((a, b) => b.ppg - a.ppg).slice(0, 12);
+    hBarList(document.getElementById("chart-ppg"), byPpg, { valueKey: "ppg", fmtValue: v => fmt(v, 2) });
+
+    const byTitles = [...DATA.team_table].filter(t => t.titles > 0).sort((a, b) => b.titles - a.titles).slice(0, 12);
+    if (byTitles.length) {
+      hBarList(document.getElementById("chart-titles"), byTitles, { valueKey: "titles", fmtValue: v => fmt(v, 0) });
+    } else {
+      document.getElementById("chart-titles").innerHTML = '<p class="hint">No titles recorded in this dataset.</p>';
+    }
+
+    // ---- playing style ----
+    const byPossession = [...DATA.team_style].sort((a, b) => b.avg_possession - a.avg_possession).slice(0, 12);
+    hBarList(document.getElementById("chart-possession"), byPossession, { valueKey: "avg_possession", fmtValue: v => fmt(v, 1) + "%" });
+
+    const byShots = [...DATA.team_style].sort((a, b) => b.avg_shots - a.avg_shots).slice(0, 12);
+    hBarList(document.getElementById("chart-shots"), byShots, { valueKey: "avg_shots", fmtValue: v => fmt(v, 1) });
+
+    const byPassAcc = [...DATA.team_style].filter(t => t.pass_accuracy !== null).sort((a, b) => b.pass_accuracy - a.pass_accuracy).slice(0, 12);
+    hBarList(document.getElementById("chart-passacc"), byPassAcc, { valueKey: "pass_accuracy", fmtValue: v => fmt(v, 1) + "%" });
+
+    const byCorners = [...DATA.team_style].sort((a, b) => b.avg_corners - a.avg_corners).slice(0, 12);
+    hBarList(document.getElementById("chart-corners"), byCorners, { valueKey: "avg_corners", fmtValue: v => fmt(v, 1) });
+
+    // ---- xG performance (diverging) ----
+    const xgSorted = [...DATA.xg_performance].sort((a, b) => b.diff_per_game - a.diff_per_game);
+    divBarList(document.getElementById("chart-xgdiff"), xgSorted, {
+      valueKey: "diff_per_game",
+      fmtValue: v => (v > 0 ? "+" : "") + fmt(v, 2),
+      tooltip: d => `<b>${esc(d.team)}</b><br>${d.goals_for} goals from ${fmt(d.xg_for, 1)} xG (${d.matches} matches)<br>${(d.diff_per_game > 0 ? "+" : "")}${fmt(d.diff_per_game, 3)} goals/game vs. xG`,
+    });
+    addTableToggle("chart-xgdiff", ["Team", "Matches", "xG", "Goals", "Diff/game"], xgSorted.map(d => [d.team, d.matches, fmt(d.xg_for,1), d.goals_for, (d.diff_per_game>0?"+":"")+fmt(d.diff_per_game,3)]));
+
+    // ---- shot efficiency scatter ----
+    scatterChart(document.getElementById("chart-scatter"), DATA.shot_efficiency.map(d => ({ x: d.shots_per_game, y: d.conversion_pct, label: d.team })), {
+      xLabel: "Shots per game", yLabel: "Conversion rate (%)",
+    });
+    addTableToggle("chart-scatter", ["Team", "Shots/game", "Conversion %", "Goals/game"], [...DATA.shot_efficiency].sort((a,b)=>b.conversion_pct-a.conversion_pct).map(d => [d.team, fmt(d.shots_per_game,1), fmt(d.conversion_pct,1)+"%", fmt(d.goals_per_game,2)]));
+
+    // ---- discipline ----
+    const worstDiscipline = [...DATA.discipline].sort((a, b) => b.trouble_score - a.trouble_score).slice(0, 10);
+    hBarList(document.getElementById("chart-cards-worst"), worstDiscipline, { valueKey: "cards_per_game", fmtValue: v => fmt(v, 2) });
+    const bestDiscipline = [...DATA.discipline].sort((a, b) => a.trouble_score - b.trouble_score).slice(0, 10);
+    hBarList(document.getElementById("chart-cards-best"), bestDiscipline, { valueKey: "cards_per_game", fmtValue: v => fmt(v, 2), alt: true });
+
+    // ---- importance ----
+    renderTable(document.getElementById("importance-table"), [
+      { key: "season", label: "Season" },
+      { key: "date", label: "Date" },
+      { key: "home", label: "Home" },
+      { key: "away", label: "Away" },
+      { key: "score", label: "Score" },
+      { key: "importance", label: "Importance", num: true, fmt: v => fmt(v, 3) },
+    ], DATA.importance.top_matches, { defaultSort: "importance", defaultDir: "desc" });
+
+    renderTable(document.getElementById("derby-table"), [
+      { key: "pair", label: "Fixture" },
+      { key: "meetings", label: "Derby meetings", num: true },
+    ], DATA.importance.top_derby_fixtures, { defaultSort: "meetings", defaultDir: "desc" });
+
+    // ---- promising teams ----
+    const promising = DATA.promising.points_trend.slice(0, 20);
+    divBarList(document.getElementById("chart-promising"), promising, {
+      valueKey: "delta",
+      fmtValue: v => (v > 0 ? "+" : "") + v,
+      tooltip: d => `<b>${esc(d.team)}</b><br>${d.points_earlier} pts (${esc(d.earlier_season)}) &rarr; ${d.points_latest} pts (${esc(d.latest_season)})<br>${(d.delta>0?"+":"")+d.delta} points`,
+    });
+
+    document.getElementById("footer").textContent = `Generated ${new Date(DATA.generated_at).toLocaleString()} from acca-bot's local Premier League dataset (data/acca-bot.sqlite3). Regenerate with scripts/build_history_dashboard.py.`;
+  }
+
+  function addTableToggle(chartElId, headers, rows) {
+    const container = document.getElementById(chartElId);
+    const details = document.createElement("details");
+    details.className = "table-toggle";
+    const summary = document.createElement("summary");
+    summary.textContent = "View as table";
+    details.appendChild(summary);
+    const table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML = `<thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    details.appendChild(table);
+    container.appendChild(details);
+  }
+
+  document.addEventListener("mousemove", moveTooltip);
+  init();
+})();
+</script>
+</body>
+</html>

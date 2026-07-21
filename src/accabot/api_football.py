@@ -106,3 +106,27 @@ class ApiFootballClient:
 
     def standings(self, *, league: int, season: int) -> dict[str, Any]:
         return self._get("/standings", {"league": league, "season": season})
+
+    def players(
+        self,
+        *,
+        league: int,
+        season: int,
+        team: int | None = None,
+        page: int = 1,
+    ) -> dict[str, Any]:
+        """Per-player season statistics, paginated (20 players/page)."""
+        return self._get("/players", {"league": league, "season": season, "team": team, "page": page})
+
+    def team_statistics(self, *, league: int, season: int, team: int) -> dict[str, Any]:
+        """Season-aggregate team statistics (form, goal timing, over/under, clean sheets, etc.)."""
+        return self._get("/teams/statistics", {"league": league, "season": season, "team": team})
+
+    def transfers(self, *, player: int | None = None, team: int | None = None) -> dict[str, Any]:
+        return self._get("/transfers", {"player": player, "team": team})
+
+    def trophies(self, *, player: int | None = None, coach: int | None = None) -> dict[str, Any]:
+        return self._get("/trophies", {"player": player, "coach": coach})
+
+    def sidelined(self, *, player: int | None = None, coach: int | None = None) -> dict[str, Any]:
+        return self._get("/sidelined", {"player": player, "coach": coach})

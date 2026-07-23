@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Premier League — Squads</title>
+  <style>__SHARED_STYLE__</style>
+  <style>
+  /* ---- Squads page additions ---- */
+  .controls-row { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin-bottom: 4px; }
+  .controls-row label { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+  .controls-row select {
+    min-height: 34px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 650; min-width: 190px;
+  }
+  .backlink { color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 650; }
+  .backlink:hover { color: var(--text-primary); }
+  .pos-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 20px; padding: 0 6px;
+    border-radius: 5px; font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+  .pos-G { background: color-mix(in srgb, var(--series-4) 26%, transparent); color: var(--text-primary); }
+  .pos-D { background: color-mix(in srgb, var(--series-5) 24%, transparent); color: var(--text-primary); }
+  .pos-M { background: color-mix(in srgb, var(--series-1) 20%, transparent); color: var(--text-primary); }
+  .pos-F { background: color-mix(in srgb, var(--series-8) 22%, transparent); color: var(--text-primary); }
+  .derived-note { font-size: 12.5px; color: var(--text-secondary); background: var(--surface-1);
+    border: 1px solid var(--border); border-left: 3px solid var(--series-4); border-radius: 8px; padding: 12px 14px; margin: 0 0 18px; max-width: 82ch; }
+
+  /* tactics board */
+  .pitch-wrap { position: relative; background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .pitch {
+    position: relative; width: 100%; aspect-ratio: 5 / 7; max-height: 620px;
+    margin: 0 auto; display: flex; flex-direction: column; justify-content: space-evenly;
+    gap: 6px; padding: 3.5% 3%;
+    background:
+      radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--series-2) 6%, transparent), transparent 62%),
+      color-mix(in srgb, var(--series-2) 4%, var(--page));
+    border-radius: 10px; overflow: hidden;
+  }
+  .pitch .markings { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .pitch .markings line, .pitch .markings rect, .pitch .markings circle {
+    stroke: var(--baseline); stroke-opacity: .55; fill: none; stroke-width: 1.2;
+  }
+  .pitch-row { position: relative; z-index: 2; display: flex; justify-content: space-evenly; align-items: center; gap: 4px; flex: 1; }
+  .pchip {
+    display: flex; flex-direction: column; align-items: center; gap: 3px; text-decoration: none;
+    color: inherit; max-width: 30%; min-width: 0; cursor: pointer;
+  }
+  .pchip .dot {
+    width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 750; color: var(--text-primary); border: 1.5px solid var(--border);
+    font-variant-numeric: tabular-nums; transition: transform .1s;
+  }
+  .pchip:hover .dot { transform: scale(1.12); border-color: var(--text-secondary); }
+  .pchip:focus-visible { outline: 2px solid var(--series-1); outline-offset: 3px; border-radius: 6px; }
+  .pchip.dot-G .dot { background: color-mix(in srgb, var(--series-4) 34%, var(--surface-1)); }
+  .pchip.dot-D .dot { background: color-mix(in srgb, var(--series-5) 32%, var(--surface-1)); }
+  .pchip.dot-M .dot { background: color-mix(in srgb, var(--series-1) 28%, var(--surface-1)); }
+  .pchip.dot-F .dot { background: color-mix(in srgb, var(--series-8) 30%, var(--surface-1)); }
+  .pchip .nm { font-size: 11.5px; font-weight: 650; text-align: center; line-height: 1.15; max-width: 82px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pchip .st { font-size: 10.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+  .squad-side { display: grid; grid-template-columns: 1.35fr 1fr; gap: 18px; align-items: start; }
+  .bench-card h3 { font-size: 14px; margin: 0 0 2px; }
+  .bench-list { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+  .bench-row { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 8px; padding: 4px 0;
+    border-bottom: 1px solid var(--border); font-size: 12.5px; text-decoration: none; color: inherit; }
+  .bench-row:last-child { border-bottom: none; }
+  .bench-row:hover .bn { color: var(--text-primary); text-decoration: underline; }
+  .bench-row .bn { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bench-row .bs { color: var(--text-muted); font-variant-numeric: tabular-nums; font-size: 11.5px; }
+
+  @media (max-width: 900px) {
+    .squad-side { grid-template-columns: 1fr; }
+    .pitch { max-height: none; }
+  }
+  @media (max-width: 560px) {
+    .controls-row select { width: 100%; }
+    .controls-row label { width: 100%; justify-content: space-between; }
+    .pchip .dot { width: 32px; height: 32px; font-size: 11px; }
+    .pchip .nm { font-size: 10.5px; max-width: 64px; }
+  }
+  </style>
+</head>
+<body class="viz-root">
+
+  <header class="hero">
+    <div class="wrap">
+      <a class="backlink" href="pl_history_dashboard.html">&larr; History dashboard</a>
+      <h1>Squads &amp; lineups</h1>
+      <p class="sub" id="hero-sub">Loading&hellip;</p>
+      <p class="note">Pick a club and season to see its most-used XI on a tactics board plus the full squad. Every stat is a Premier League season total: apps, starts, minutes, goals and assists cover all seasons from 2010/11; ratings begin 2014/15. Tap any player to open their full profile.</p>
+      <div class="controls-row" id="controls">
+        <label>Club <select id="c-team"></select></label>
+        <label>Season <select id="c-season"></select></label>
+        <span class="period-summary" id="c-summary"></span>
+      </div>
+      <div class="kpi-row" id="kpi-row"></div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <a href="pl_history_dashboard.html">&larr; History dashboard</a>
+    <a href="pl_team_explorer.html">Team Explorer</a>
+    <a href="pl_players.html">Players</a>
+    <a href="#lineup">Most-used XI</a>
+    <a href="#squad">Full squad</a>
+    <a href="pl_transfers.html">Transfers &rarr;</a>
+  </nav>
+
+  <div class="wrap">
+    <p class="derived-note">
+      <b>How this XI is built:</b> this database has no match-by-match lineups, so the &ldquo;most-used XI&rdquo; is the eleven players with the most <b>starts</b> this season, laid out in the shape those starts actually form (it is not a literal team-sheet from any single game). Everyone else appears in the squad below.
+    </p>
+
+    <section class="block" id="lineup">
+      <h2 id="lineup-title">Most-used XI</h2>
+      <p class="desc" id="lineup-desc"></p>
+      <div class="squad-side">
+        <div class="pitch-wrap">
+          <div class="pitch" id="pitch">
+            <svg class="markings" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">
+              <rect x="1" y="1" width="98" height="138" rx="2"></rect>
+              <line x1="1" y1="70" x2="99" y2="70"></line>
+              <circle cx="50" cy="70" r="11"></circle>
+              <rect x="28" y="1" width="44" height="20"></rect>
+              <rect x="40" y="1" width="20" height="7"></rect>
+              <rect x="28" y="119" width="44" height="20"></rect>
+              <rect x="40" y="132" width="20" height="7"></rect>
+            </svg>
+          </div>
+        </div>
+        <div class="bench-card card">
+          <h3 id="bench-title">Squad depth</h3>
+          <p class="hint" id="bench-hint">Players outside the most-used XI, by minutes played.</p>
+          <div class="bench-list" id="bench"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="squad">
+      <h2>Full squad</h2>
+      <p class="desc">Every player who logged a Premier League appearance for this club this season. Sortable; click a column header to reorder, click a name to open the player profile.</p>
+      <div class="card wide">
+        <div class="table-scroll"><table class="data-table" id="squad-table"></table></div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="site" id="footer"></footer>
+  <div class="tooltip" id="tooltip"></div>
+
+<script>
+const RAW = __SQUADS_RAW__;
+</script>
+<script>
+(function () {
+  "use strict";
+  const PLAYERS_HREF = "pl_players.html";
+  const tooltip = document.getElementById("tooltip");
+  function showTooltip(evt, html) { tooltip.innerHTML = html; tooltip.classList.add("show"); moveTooltip(evt); }
+  function moveTooltip(evt) { tooltip.style.left = evt.clientX + "px"; tooltip.style.top = (evt.clientY - 10) + "px"; }
+  function hideTooltip() { tooltip.classList.remove("show"); }
+  function fmt(n, d) { if (n === null || n === undefined || Number.isNaN(n)) return "-"; return Number(n).toLocaleString(undefined, { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+  const seasonLabel = s => s + "/" + String(s + 1).slice(-2);
+  const teamName = id => (RAW.teams[String(id)] || ["#" + id])[0];
+  const POSNAME = { G: "GK", D: "DEF", M: "MID", F: "FWD", "?": "-" };
+  const POS_ORDER = ["F", "M", "D", "G"]; // top (attack) -> bottom (goal)
+  const S = { pid: 0, tid: 1, season: 2, pos: 3, apps: 4, starts: 5, mins: 6, rating: 7, goals: 8, assists: 9 };
+
+  function posBadge(pos) { return `<span class="pos-badge pos-${pos}">${POSNAME[pos] || "-"}</span>`; }
+  function playerName(pid) { return (RAW.players[String(pid)] || ["#" + pid, ""])[0]; }
+  function playerNat(pid) { return (RAW.players[String(pid)] || ["", ""])[1]; }
+  function shortName(name) { const parts = String(name).trim().split(/\s+/); return parts.length > 1 ? parts[parts.length - 1] : name; }
+  function initials(name) { const p = String(name).trim().split(/\s+/); return ((p[0] || "")[0] || "") + (p.length > 1 ? (p[p.length - 1][0] || "") : ""); }
+  function playerHref(pid) { return `${PLAYERS_HREF}?player=${pid}`; }
+
+  function renderTable(tableEl, columns, rows, opts) {
+    opts = opts || {};
+    let sortKey = opts.defaultSort || columns[0].key, sortDir = opts.defaultDir || "desc";
+    function draw() {
+      const sorted = [...rows].sort((a, b) => { const av = a[sortKey], bv = b[sortKey]; let c = typeof av === "string" ? av.localeCompare(bv) : (av == null ? -Infinity : av) - (bv == null ? -Infinity : bv); return sortDir === "asc" ? c : -c; });
+      tableEl.innerHTML = `<thead><tr>${columns.map(c => `<th data-key="${c.key}" class="${c.num ? "num" : ""} ${sortKey === c.key ? (sortDir === "asc" ? "sort-asc" : "sort-desc") : ""}">${esc(c.label)}</th>`).join("")}</tr></thead>` +
+        `<tbody>${sorted.map(r => `<tr>${columns.map(c => `<td class="${c.num ? "num" : ""}">${c.fmt ? c.fmt(r[c.key], r) : esc(r[c.key])}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      tableEl.querySelectorAll("th").forEach(th => th.addEventListener("click", () => { const k = th.getAttribute("data-key"); if (sortKey === k) sortDir = sortDir === "asc" ? "desc" : "asc"; else { sortKey = k; sortDir = (k === "name" || k === "pos") ? "asc" : "desc"; } draw(); }));
+    }
+    draw();
+  }
+
+  // ---- data helpers ----
+  const el = id => document.getElementById(id);
+  const SEASONS = RAW.seasons.slice();
+
+  // squad rows indexed by team|season for quick lookup
+  const byTeamSeason = new Map();
+  const teamSeasons = new Map(); // tid -> Set(seasons)
+  RAW.squad.forEach(r => {
+    const key = r[S.tid] + "|" + r[S.season];
+    if (!byTeamSeason.has(key)) byTeamSeason.set(key, []);
+    byTeamSeason.get(key).push(r);
+    if (!teamSeasons.has(r[S.tid])) teamSeasons.set(r[S.tid], new Set());
+    teamSeasons.get(r[S.tid]).add(r[S.season]);
+  });
+
+  const teamList = Object.keys(RAW.teams)
+    .map(id => ({ id: +id, name: RAW.teams[id][0] }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  function tip(r) {
+    return `<b>${esc(playerName(r[S.pid]))}</b> · ${POSNAME[r[S.pos]]}${playerNat(r[S.pid]) ? " · " + esc(playerNat(r[S.pid])) : ""}<br>` +
+      `${r[S.starts]} starts / ${r[S.apps]} apps · ${fmt(r[S.mins], 0)} mins<br>` +
+      `${r[S.goals]}G ${r[S.assists]}A${r[S.rating] != null ? " · " + fmt(r[S.rating], 2) + "★" : ""}`;
+  }
+
+  // ---- render ----
+  function render(tid, season) {
+    const rows = (byTeamSeason.get(tid + "|" + season) || []).slice();
+    const teamNm = teamName(tid);
+    const sLbl = seasonLabel(season);
+
+    el("hero-sub").textContent = `${teamNm} · ${sLbl} · ${rows.length} players used`;
+    el("c-summary").textContent = rows.length ? `${rows.length} players · derived from season stats` : "No squad data for this club/season";
+
+    if (!rows.length) {
+      el("pitch").querySelectorAll(".pitch-row").forEach(n => n.remove());
+      el("bench").innerHTML = `<p class="hint">${esc(teamNm)} were not in the Premier League in ${sLbl}.</p>`;
+      el("squad-table").innerHTML = "";
+      el("kpi-row").innerHTML = "";
+      el("lineup-desc").textContent = "";
+      return;
+    }
+
+    // ---- most-used XI: top 11 by starts, tie-break minutes ----
+    const byStarts = [...rows].sort((a, b) => (b[S.starts] - a[S.starts]) || (b[S.mins] - a[S.mins]));
+    const xi = byStarts.slice(0, 11);
+    const xiIds = new Set(xi.map(r => r[S.pid]));
+
+    // bucket XI by position, keep positional order within a row by starts
+    const buckets = { F: [], M: [], D: [], G: [] };
+    xi.forEach(r => { (buckets[r[S.pos]] || buckets.M).push(r); });
+    // Conventional football notation: outfield lines back-to-front, keeper implied.
+    const shape = ["D", "M", "F"].map(p => buckets[p].length).filter(n => n > 0).join("-");
+
+    // ---- KPIs ----
+    const topScorer = [...rows].sort((a, b) => b[S.goals] - a[S.goals])[0];
+    const mostMins = [...rows].sort((a, b) => b[S.mins] - a[S.mins])[0];
+    const rated = rows.filter(r => r[S.rating] != null && r[S.mins] >= 450);
+    const bestRated = rated.sort((a, b) => b[S.rating] - a[S.rating])[0];
+    const totalGoals = rows.reduce((s, r) => s + r[S.goals], 0);
+    el("kpi-row").innerHTML = [
+      { label: "Players used", value: rows.length },
+      { label: "Formation shape", value: shape || "-", sub: "most-used XI" },
+      { label: "Top scorer", value: topScorer ? shortName(playerName(topScorer[S.pid])) : "-", sub: topScorer ? topScorer[S.goals] + " goals" : "" },
+      { label: "Most minutes", value: mostMins ? shortName(playerName(mostMins[S.pid])) : "-", sub: mostMins ? fmt(mostMins[S.mins], 0) + " mins" : "" },
+      { label: "Best rated", value: bestRated ? shortName(playerName(bestRated[S.pid])) : "-", sub: bestRated ? fmt(bestRated[S.rating], 2) + " ★" : "≥450 mins" },
+      { label: "Team goals", value: totalGoals },
+    ].map(k => `<div class="kpi"><p class="label">${esc(k.label)}</p><p class="value">${esc(k.value)}${k.sub ? ` <small>${esc(k.sub)}</small>` : ""}</p></div>`).join("");
+
+    el("lineup-title").textContent = `Most-used XI — ${shape || ""}`;
+    el("lineup-desc").textContent = `The eleven ${teamNm} players with the most starts in ${sLbl}, arranged ${shape ? "as a " + shape : ""} by where those starts fell. Numbers under each player are their starts this season.`;
+
+    // ---- draw pitch rows ----
+    const pitch = el("pitch");
+    pitch.querySelectorAll(".pitch-row").forEach(n => n.remove());
+    POS_ORDER.forEach(pos => {
+      const group = buckets[pos];
+      if (!group.length) return;
+      const row = document.createElement("div");
+      row.className = "pitch-row";
+      group.forEach(r => {
+        const a = document.createElement("a");
+        a.className = "pchip dot-" + r[S.pos];
+        a.href = playerHref(r[S.pid]);
+        a.innerHTML = `<span class="dot">${esc(initials(playerName(r[S.pid])))}</span>` +
+          `<span class="nm" title="${esc(playerName(r[S.pid]))}">${esc(shortName(playerName(r[S.pid])))}</span>` +
+          `<span class="st">${r[S.starts]} st</span>`;
+        a.addEventListener("mousemove", e => showTooltip(e, tip(r)));
+        a.addEventListener("mouseleave", hideTooltip);
+        row.appendChild(a);
+      });
+      pitch.appendChild(row);
+    });
+
+    // ---- bench: everyone not in XI, by minutes ----
+    const bench = byStarts.slice(11).sort((a, b) => b[S.mins] - a[S.mins]);
+    el("bench-title").textContent = `Squad depth (${bench.length})`;
+    el("bench").innerHTML = bench.length ? bench.map(r => {
+      const a = `<a class="bench-row" href="${playerHref(r[S.pid])}">` +
+        `<span>${posBadge(r[S.pos])}</span>` +
+        `<span class="bn" title="${esc(playerName(r[S.pid]))}">${esc(playerName(r[S.pid]))}</span>` +
+        `<span class="bs">${r[S.apps]} apps · ${fmt(r[S.mins], 0)}m · ${r[S.goals]}G ${r[S.assists]}A</span>` +
+        `</a>`;
+      return a;
+    }).join("") : `<p class="hint">The whole squad started &mdash; no depth players outside the XI.</p>`;
+
+    // ---- full squad table ----
+    const tableRows = rows.map(r => ({
+      name: playerName(r[S.pid]), pid: r[S.pid], pos: r[S.pos],
+      apps: r[S.apps], starts: r[S.starts], mins: r[S.mins],
+      goals: r[S.goals], assists: r[S.assists], ga: r[S.goals] + r[S.assists],
+      rating: r[S.rating],
+    }));
+    renderTable(el("squad-table"), [
+      { key: "name", label: "Player", fmt: (v, r) => `<a class="backlink" style="font-weight:650" href="${playerHref(r.pid)}">${esc(v)}</a>` },
+      { key: "pos", label: "Pos", fmt: v => posBadge(v) },
+      { key: "apps", label: "Apps", num: true },
+      { key: "starts", label: "Starts", num: true },
+      { key: "mins", label: "Mins", num: true, fmt: v => fmt(v, 0) },
+      { key: "goals", label: "G", num: true },
+      { key: "assists", label: "A", num: true },
+      { key: "ga", label: "G+A", num: true },
+      { key: "rating", label: "Rating", num: true, fmt: v => v == null ? "-" : fmt(v, 2) },
+    ], tableRows, { defaultSort: "mins", defaultDir: "desc" });
+
+    el("footer").textContent = `Generated ${new Date(RAW.generated_at).toLocaleString()} from acca-bot's local Premier League dataset. Squads are derived from season stats, not match-day team sheets.`;
+  }
+
+  // ---- controls ----
+  const teamSel = el("c-team"), seasonSel = el("c-season");
+  teamSel.innerHTML = teamList.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join("");
+
+  function fillSeasons(tid) {
+    const avail = SEASONS.filter(s => (teamSeasons.get(tid) || new Set()).has(s));
+    const list = avail.length ? avail : SEASONS;
+    const prev = +seasonSel.value;
+    seasonSel.innerHTML = list.map(s => `<option value="${s}">${seasonLabel(s)}</option>`).join("");
+    if (list.includes(prev)) seasonSel.value = String(prev);
+    else seasonSel.value = String(list[list.length - 1]);
+  }
+
+  let curTeam = RAW.default_team && RAW.teams[String(RAW.default_team)] ? RAW.default_team : teamList[0].id;
+  teamSel.value = String(curTeam);
+  fillSeasons(curTeam);
+  if (RAW.default_season && (teamSeasons.get(curTeam) || new Set()).has(RAW.default_season)) seasonSel.value = String(RAW.default_season);
+
+  teamSel.addEventListener("change", () => { curTeam = +teamSel.value; fillSeasons(curTeam); render(curTeam, +seasonSel.value); });
+  seasonSel.addEventListener("change", () => render(curTeam, +seasonSel.value));
+  document.addEventListener("mousemove", e => { if (tooltip.classList.contains("show")) moveTooltip(e); });
+
+  render(curTeam, +seasonSel.value);
+})();
+</script>
+</body>
+</html>

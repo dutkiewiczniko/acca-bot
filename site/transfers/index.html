@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Premier League — Transfers</title>
+  <style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page:           #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good-text:      #006300;
+
+    --series-1: #2a78d6; /* blue   */
+    --series-2: #008300; /* green  */
+    --series-3: #e87ba4; /* magenta*/
+    --series-4: #eda100; /* yellow */
+    --series-5: #1baf7a; /* aqua   */
+    --series-6: #eb6834; /* orange */
+    --series-7: #4a3aa7; /* violet */
+    --series-8: #e34948; /* red    */
+
+    --seq-100: #cde2fb; --seq-150: #b7d3f6; --seq-200: #9ec5f4; --seq-250: #86b6ef;
+    --seq-300: #6da7ec; --seq-350: #5598e7; --seq-400: #3987e5; --seq-450: #2a78d6;
+    --seq-500: #256abf; --seq-550: #1c5cab; --seq-600: #184f95; --seq-650: #104281;
+    --seq-700: #0d366b;
+
+    --div-pos: #2a78d6;  /* blue */
+    --div-neg: #e34948;  /* red */
+    --div-mid: #f0efec;
+
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page:           #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --good-text:      #0ca30c;
+
+      --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+      --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+
+      --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page:           #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --good-text:      #0ca30c;
+
+    --series-1: #3987e5; --series-2: #008300; --series-3: #d55181; --series-4: #c98500;
+    --series-5: #199e70; --series-6: #d95926; --series-7: #9085e9; --series-8: #e66767;
+
+    --div-pos: #3987e5; --div-neg: #e66767; --div-mid: #383835;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body.viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 64px; }
+
+  header.hero {
+    padding: 40px 20px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-1);
+  }
+  header.hero .wrap { padding-bottom: 0; }
+  header.hero h1 { margin: 0 0 6px; font-size: clamp(24px, 4vw, 34px); font-weight: 750; }
+  header.hero p.sub { margin: 0; color: var(--text-secondary); font-size: 15px; max-width: 70ch; }
+  header.hero p.note { margin: 10px 0 0; color: var(--text-muted); font-size: 13px; max-width: 70ch; }
+
+  .period-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+    margin-top: 22px; padding: 12px 14px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  }
+  .period-controls { display: flex; flex-wrap: wrap; gap: 12px; }
+  .period-controls label { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+  .period-controls select {
+    min-height: 34px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--page); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 650;
+  }
+  .period-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .period-presets button {
+    min-height: 30px; padding: 0 11px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--page); color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+  }
+  .period-presets button:hover { color: var(--text-primary); }
+  .period-presets button.active { background: var(--series-1); border-color: var(--series-1); color: #fff; }
+  .period-summary { color: var(--text-muted); font-size: 12px; margin-left: auto; }
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0,1fr));
+    gap: 12px;
+    margin-top: 18px;
+  }
+  .kpi {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 14px 12px;
+    min-width: 0;
+  }
+  .kpi .label { color: var(--text-secondary); font-size: 12px; margin: 0 0 6px; }
+  .kpi .value { font-size: 24px; font-weight: 700; margin: 0; }
+  .kpi .value small { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+
+  nav.tabs {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; gap: 2px; overflow-x: auto;
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+  }
+  nav.tabs a {
+    display: inline-block; padding: 12px 14px; font-size: 13px; font-weight: 650;
+    color: var(--text-secondary); text-decoration: none; white-space: nowrap;
+    border-bottom: 2px solid transparent;
+  }
+  nav.tabs a:hover { color: var(--text-primary); border-bottom-color: var(--baseline); }
+
+  section.block { padding: 40px 0 8px; border-bottom: 1px solid var(--border); }
+  section.block:last-of-type { border-bottom: none; }
+  section.block h2 { font-size: 20px; margin: 0 0 4px; scroll-margin-top: 56px; }
+  section.block p.desc { color: var(--text-secondary); margin: 0 0 20px; max-width: 78ch; font-size: 13.5px; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 18px; min-width: 0;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  .card h3 { font-size: 14px; margin: 0 0 2px; }
+  .card p.hint { margin: 0 0 14px; color: var(--text-muted); font-size: 12px; }
+
+  .spot-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+  .spot {
+    background: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--series-1);
+    border-radius: 8px; padding: 14px 16px;
+  }
+  .spot h3 { margin: 0 0 6px; font-size: 14px; }
+  .spot p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+
+  /* bar chart (HTML/CSS based) */
+  .barlist { display: flex; flex-direction: column; gap: 6px; }
+  .barlist .row { display: grid; grid-template-columns: 128px 1fr 56px; align-items: center; gap: 8px; }
+  .barlist .row .name { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barlist .row .track { position: relative; height: 16px; background: var(--grid); border-radius: 4px; overflow: hidden; }
+  .barlist .row .fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .barlist .row .fill.alt { background: var(--series-5); }
+  .barlist .row .val { font-size: 12.5px; color: var(--text-primary); font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+  .barlist .row.highlight .name, .barlist .row.highlight .val { color: var(--text-primary); font-weight: 750; }
+
+  /* diverging bar */
+  .divlist .row { display: grid; grid-template-columns: 128px 1fr 64px; align-items: center; gap: 8px; }
+  .divlist .row .name { font-size: 12.5px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .divlist .row .track { position: relative; height: 16px; background: var(--div-mid); border-radius: 4px; overflow: hidden; }
+  .divlist .row .track::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--baseline); }
+  .divlist .row .fill { position: absolute; top: 0; height: 100%; }
+  .divlist .row .fill.pos { left: 50%; background: var(--div-pos); border-radius: 0 4px 4px 0; }
+  .divlist .row .fill.neg { right: 50%; background: var(--div-neg); border-radius: 4px 0 0 4px; }
+  .divlist .row .val { font-size: 12.5px; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+
+  svg.chart { width: 100%; height: auto; overflow: visible; display: block; }
+  svg.chart .grid-line { stroke: var(--grid); stroke-width: 1; }
+  svg.chart .baseline { stroke: var(--baseline); stroke-width: 1; }
+  svg.chart .axis-text { fill: var(--text-muted); font-size: 10.5px; }
+  svg.chart .mark-dot { stroke: var(--surface-1); stroke-width: 2; }
+  svg.chart .direct-label { fill: var(--text-secondary); font-size: 11px; font-weight: 650; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 4px; }
+  .legend .key { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 100;
+    background: var(--text-primary); color: var(--surface-1);
+    font-size: 12px; line-height: 1.4; padding: 7px 10px; border-radius: 6px;
+    max-width: 240px; opacity: 0; transform: translate(-50%, -100%); transition: opacity .08s;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip b { font-weight: 700; }
+
+  details.table-toggle { margin-top: 14px; }
+  details.table-toggle summary {
+    cursor: pointer; font-size: 12px; color: var(--text-secondary); font-weight: 650;
+    list-style: none;
+  }
+  details.table-toggle summary::-webkit-details-marker { display: none; }
+  details.table-toggle summary::before { content: "\25B8  "; }
+  details.table-toggle[open] summary::before { content: "\25BE  "; }
+
+  table.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  table.data-table th, table.data-table td {
+    padding: 7px 9px; text-align: left; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.data-table th {
+    color: var(--text-muted); font-weight: 650; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .02em; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface-1);
+  }
+  table.data-table th.sort-asc::after { content: " \2191"; }
+  table.data-table th.sort-desc::after { content: " \2193"; }
+  table.data-table td.num, table.data-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data-table tbody tr:hover { background: rgba(128,128,128,.08); }
+
+  .table-scroll { max-height: 560px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .table-scroll table.data-table { margin-top: 0; }
+
+  input.search {
+    width: 100%; max-width: 320px; padding: 8px 10px; margin-bottom: 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface-1); color: var(--text-primary);
+    font: inherit; font-size: 13px;
+  }
+
+  footer.site {
+    padding: 26px 20px 40px; text-align: center; color: var(--text-muted); font-size: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .card-grid { grid-template-columns: 1fr; }
+    .spot-grid { grid-template-columns: 1fr; }
+    .barlist .row, .divlist .row { grid-template-columns: 92px 1fr 50px; }
+    .period-summary { margin-left: 0; width: 100%; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 14px 48px; }
+    header.hero { padding: 24px 14px 20px; }
+    .kpi-row { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    .kpi { padding: 11px 11px 9px; }
+    .kpi .value { font-size: 20px; }
+    .period-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .period-controls { flex-direction: column; }
+    .period-controls label { justify-content: space-between; }
+    .period-controls select, .controls-row select.team-select { width: 100%; }
+    .period-presets { justify-content: flex-start; }
+    section.block { padding: 28px 0 8px; }
+    section.block h2 { font-size: 18px; }
+    .card { padding: 13px 13px 15px; }
+    .barlist .row, .divlist .row { grid-template-columns: 84px 1fr 46px; gap: 6px; }
+    .barlist .row .name { font-size: 12px; }
+    nav.tabs a { padding: 11px 10px; }
+  }
+</style>
+  <style>
+  /* ---- Transfers page additions ---- */
+  .controls-row { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin-bottom: 4px; }
+  .controls-row label { display: inline-flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+  .controls-row select, .controls-row input {
+    min-height: 34px; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 650;
+  }
+  .controls-row select { min-width: 130px; }
+  .controls-row input.search-input { min-width: 220px; }
+  .controls-row button.clear-btn {
+    min-height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--page); color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+  }
+  .controls-row button.clear-btn:hover { color: var(--text-primary); }
+  .backlink { color: var(--text-secondary); text-decoration: none; font-size: 13px; font-weight: 650; }
+  .backlink:hover { color: var(--text-primary); }
+
+  .graph-layout { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(240px,1fr); gap: 18px; align-items: start; }
+  .canvas-card { position: relative; background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+  #graph { width: 100%; display: block; touch-action: manipulation; cursor: default; }
+  .info-panel { display: flex; flex-direction: column; gap: 14px; }
+  .info-box { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .info-box h3 { margin: 0 0 8px; font-size: 14px; }
+  .info-box .lead { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 6px; }
+  .info-box .metric-row { display: flex; gap: 16px; margin: 6px 0 2px; }
+  .info-box .metric { display: flex; flex-direction: column; }
+  .info-box .metric .m-val { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .info-box .metric .m-lab { font-size: 11px; color: var(--text-secondary); }
+  .info-box .m-in { color: var(--series-1); }
+  .info-box .m-out { color: var(--series-6); }
+  .partner-list, .trace-list { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+  .partner-list .p, .trace-list .t { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+  .partner-list .p:last-child, .trace-list .t:last-child { border-bottom: none; }
+  .partner-list .p .dir { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .trace-list .t .yr { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .trace-list .t .mv { color: var(--text-secondary); }
+
+  .recency-legend { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .recency-legend .bar { flex: 1; height: 10px; border-radius: 5px; }
+  .recency-legend .lab { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+  .dir-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+  .dir-legend .key { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .dir-legend .swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+
+  .hint-inline { font-size: 12px; color: var(--text-muted); margin: 8px 2px 0; }
+
+  @media (max-width: 900px) {
+    .graph-layout { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .controls-row select, .controls-row input { width: 100%; }
+    .controls-row label { width: 100%; justify-content: space-between; }
+    .controls-row input.search-input { min-width: 0; }
+  }
+  </style>
+</head>
+<body class="viz-root">
+
+  <header class="hero">
+    <div class="wrap">
+      <a class="backlink" href="/">&larr; History dashboard</a>
+      <h1>Transfers over time</h1>
+      <p class="sub" id="hero-sub">Loading&hellip;</p>
+      <p class="note">Every club that has played in the Premier League sits on the ring. Each line is a player moving between two of them; brighter lines are more recent moves, fainter ones are older. Hover or tap a club to trace its arrivals and departures, narrow the season range, or search a player to follow their path across clubs.</p>
+      <div class="controls-row" id="controls">
+        <label>From season <select id="c-from"></select></label>
+        <label>To season <select id="c-to"></select></label>
+        <label>Trace player <input class="search-input" id="c-player" list="player-list" placeholder="Type a name&hellip;" autocomplete="off"></label>
+        <datalist id="player-list"></datalist>
+        <button class="clear-btn" id="c-clear">Clear selection</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <a href="/">&larr; History dashboard</a>
+    <a href="/teams">Team Explorer</a>
+    <a href="/players">Players</a>
+    <a href="/squads">Squads</a>
+    <a href="#graph-section">Transfer map</a>
+    <a href="#table-section">Transfer list</a>
+  </nav>
+
+  <div class="wrap">
+    <section class="block" id="graph-section">
+      <h2>Transfer map</h2>
+      <p class="desc" id="graph-desc">Inferred from season-to-season club changes &mdash; this dataset has no transfer records, fees or dates, only which club a player was registered at each season. A move is counted when a player's club changes between (or within) seasons.</p>
+      <div class="graph-layout">
+        <div class="canvas-card">
+          <canvas id="graph" role="img" aria-label="Radial diagram of Premier League clubs linked by transfer lines"></canvas>
+        </div>
+        <div class="info-panel">
+          <div class="info-box" id="info">
+            <h3 id="info-title">All clubs</h3>
+            <p class="lead" id="info-lead">Hover or tap a club to highlight its transfers. Click to keep it selected.</p>
+            <div id="info-body"></div>
+          </div>
+          <div class="info-box">
+            <h3>Reading the map</h3>
+            <div class="recency-legend">
+              <span class="lab" id="leg-old">older</span>
+              <span class="bar" id="leg-bar"></span>
+              <span class="lab" id="leg-new">recent</span>
+            </div>
+            <div class="dir-legend">
+              <span class="key"><span class="swatch" style="background:var(--series-1)"></span>Arrivals (in)</span>
+              <span class="key"><span class="swatch" style="background:var(--series-6)"></span>Departures (out)</span>
+              <span class="key"><span class="swatch" style="background:var(--series-4)"></span>Player path</span>
+            </div>
+            <p class="hint-inline">Node size grows with the number of transfers in view. A move within one season (a mid-season switch or loan) is counted the same as a summer move.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="table-section">
+      <h2>Transfer list</h2>
+      <p class="desc">Every move in the current season range and selection. Sort by any column; filter by club or player name.</p>
+      <input class="search" id="t-filter" placeholder="Filter by club or player&hellip;">
+      <div class="card wide">
+        <div class="table-scroll"><table class="data-table" id="tx-table"></table></div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="site" id="footer"></footer>
+  <div class="tooltip" id="tooltip"></div>
+
+<script>
+const RAW = {"generated_at":"2026-07-21T20:19:05+00:00","league":"Premier League","seasons":[2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025],"teams":{"33":["Manchester United","MUN"],"34":["Newcastle","NEW"],"35":["Bournemouth","BOU"],"36":["Fulham","FUL"],"37":["Huddersfield","HUD"],"38":["Watford","WAT"],"39":["Wolves","WOL"],"40":["Liverpool","LIV"],"41":["Southampton","SOU"],"42":["Arsenal","ARS"],"43":["Cardiff","CAR"],"44":["Burnley","BUR"],"45":["Everton","EVE"],"46":["Leicester","LEI"],"47":["Tottenham","TOT"],"48":["West Ham","WHU"],"49":["Chelsea","CHE"],"50":["Manchester City","MCI"],"51":["Brighton","BHA"],"52":["Crystal Palace","CRY"],"53":["Reading","REA"],"54":["Birmingham","BIR"],"55":["Brentford","BRE"],"57":["Ipswich","IPS"],"60":["West Brom","WBA"],"61":["Wigan","WIG"],"62":["Sheffield Utd","SHU"],"63":["Leeds","LEE"],"64":["Hull City","HUL"],"65":["Nottingham Forest","NFO"],"66":["Aston Villa","AVL"],"67":["Blackburn","BLB"],"68":["Bolton","BOL"],"70":["Middlesbrough","MID"],"71":["Norwich","NOR"],"72":["QPR","QPR"],"75":["Stoke City","STK"],"76":["Swansea","SWA"],"746":["Sunderland","SUN"],"1356":["Blackpool","BLP"],"1359":["Luton","LUT"]},"players":{"82227":"Stephen Francis Henderson","328089":"A. Gray","18":"J. Sancho","20500":"K. Henry","311334":"F. Buonanotte","54":"Diego Costa","114743":"K. Nolan","114744":"Adam Johnson","114745":"Mikel Arteta Amatriain","36922":"S. van den Berg","114747":"Sylvain Distin","114748":"Dean Hammond","114751":"Brede Hangeland","114752":"Charles N'Zogbia","114757":"Richard  Dunne","114759":"S. Reid","114760":"Steve Harper","81993":"J. Walters","114761":"B. Zamora","114763":"Matthew  Upson","76":"M. Nakamba","114764":"R. Ferdinand","114765":"J. J\u00e4\u00e4skel\u00e4inen","80":"E. Dennis","114768":"Andy Johnson","83":"A. Danjuma","114772":"Nicolas Anelka","30805":"V. Behrami","114773":"Craig Bellamy","137302":"C. Archer","137303":"E. Guessand","10329":"Jo\u00e3o Pedro","82011":"D. Bent","114779":"J. K\u00e9b\u00e9","30813":"Sandro Raniere Guimar\u00e3es Cordeiro","82017":"C. Baird","114789":"Tommy Smith","114790":"Kevin  Phillips","104":"Carlos Vin\u00edcius","114792":"A. Fay\u00e9","106":"N. Chadli","114793":"M. Petri\u0107","108":"Cesc F\u00e0bregas","20589":"B. Mbeumo","114794":"C. Nash","114797":"Joseph Phillip Yobo","114800":"Raul Jos\u00e9 Trindade Meireles","113":"G. Nkoudou","114806":"Jos\u00e9 Bosingwa da Silva","119":"R. Falcao","114811":"J. Roberts","114812":"Thomas Hitzlsperger","114813":"Ian  Harte","284797":"D. Ouattara","114815":"M. Owen","114817":"J. Jenas","114820":"Louis  Saha","133":"C. Lenglet","100486":"Ei\u00f0ur Sm\u00e1ri Gudjohnsen","26759":"F. Macheda","114822":"Kieron  Dyer","39049":"M. Eikrem","114829":"N. Shorey","82062":"Larnell James Cole","41104":"Jo\u00e3o Palhinha","147":"Philippe Coutinho","114836":"D. Campbell","47253":"Ignasi Miquel","114839":"P. Scharner","161948":"L. Delap","2205":"H. Ben Arfa","158":"P. Gazzaniga","47261":"Mathieu Flamini","160":"M. Vorm","18592":"I. Ndiaye","162":"T. Alderweireld","163":"S. Aurier","164":"B. Davies","82079":"L. Barnett","98466":"L. Dalla Valle","167":"D. Rose","114850":"L. Young","169":"K. Trippier","2218":"I. Sarr","171":"K. Walker-Peters","172":"D. Alli","20649":"Y. Wissa","174":"C. Eriksen","114854":"Jonathan Woodgate","12464":"Nikica Jelavi\u0107","82097":"A. Palmer","82098":"J. Kean","179":"M. Sissoko","180":"O. Skipp","181":"V. Wanyama","182":"H. Winks","104629":"E. Frimpong","184":"H. Kane","185":"Llorente","114877":"Keith  Andrews","190":"C\u00e9dric Soares","114879":"W. Bridge","114881":"Bradley  Orr","47311":"Mikel Merino","114895":"O. Hargreaves","334037":"Tyrique George","114902":"S. Kyrgiakos","82138":"Shola Ameobi","82140":"B. Galloway","2273":"Kepa","2275":"W. Caballero","297187":"L. Hjelde","2277":"R. Green","2278":"Marcos Alonso","2279":"E. Ampadu","2281":"Gary Cahill","2283":"David Luiz","2284":"Emerson","2287":"R. Barkley","2288":"Daniel Noel Drinkwater","2289":"Jorginho","2290":"N. Kant\u00e9","2291":"M. Kova\u010di\u0107","2292":"R. Loftus-Cheek","2294":"Willian","2295":"O. Giroud","30968":"A. Diamanti","249":"D. Malen","2298":"C. Hudson-Odoi","45306":"Stephen Dobbie","196855":"J. Anthony","253":"A. Areola","309501":"A. Cozier-Duberry","24882":"O. Mangala","47370":"Borja Bast\u00f3n","47371":"J. Guidetti","8465":"Dieumerci Mbokani","47380":"Marc Cucurella","281":"C. Kelleher","282":"S. Mignolet","37146":"C. Martina","162076":"D. Cirkin","285":"K. Hoever","287":"D. Lovren","289":"A. Robertson","290":"V. van Dijk","292":"J. Henderson","295":"A. Lallana","296":"J. Milner","297":"A. Oxlade-Chamberlain","37161":"L. Sinisterra","37162":"Robin van Persie","300":"G. Wijnaldum","24876":"L. Holtby","104745":"Niko Kranj\u010dar","303":"R. Brewster","304":"S. Man\u00e9","305":"D. Origi","306":"Mohamed Salah","307":"X. Shaqiri","308":"Daniel Andre Sturridge","18736":"W. Norris","18737":"J. Ruddy","18738":"R. Bennett","18739":"W. Boly","18741":"C. Coady","18742":"M. Doherty","18744":"M. Kilman","18745":"R\u00faben Vinagre","18746":"M. Gibbs-White","18747":"R. Giles","18751":"Ivan Cavaleiro","18752":"H\u00e9lder Costa","18753":"Adama Traor\u00e9","18756":"M. Stekelenburg","18759":"P. Jagielka","18762":"T. Davies","18763":"J. McCarthy","18764":"M. Schneiderlin","104780":"P. Senderos","18766":"D. Calvert-Lewin","18767":"A. Lookman","18768":"C. Tosun","18769":"T. Walcott","18770":"E. Jakupovi\u0107","180560":"H. Mejbri","18772":"J. Evans","18775":"D. Simpson","18777":"M. Albrighton","18778":"H. Barnes","102748":"J. Cole","18781":"D. Gray","18784":"J. Maddison","18789":"Gomes","18791":"B. Foster","18793":"C. Cathcart","24939":"R. Miyaichi","18796":"Daryl Janmaat","2413":"Richarlison","18798":"A. Mariappa","114862":"Yakubu Aiyegbeni","114863":"Tuncay Volkan Sanli","18802":"\u00c9. Capoue","18803":"N. Chalobah","18804":"T. Cleverley","18805":"A. Doucour\u00e9","18806":"W. Hughes","18807":"Domingos Quina","90488":"Y. Cabaye","18809":"Deulofeu","18810":"A. Gray","90491":"G. Johnson","18812":"Adri\u00e1n","90492":"S. Ireland","18814":"I. Diop","18815":"R. Fredericks","18816":"A. Masuaku","147835":"A. Omobamidele","18818":"P. Zabaleta","67971":"M. Gu\u00e9hi","67972":"C. Gallagher","18821":"G. Diangana","82307":"Gary Taylor-Fletcher","18823":"B. Johnson","90498":"E. Mangala","18825":"Samir Nasri","90503":"Y. Kaboul","18827":"C. S\u00e1nchez","18828":"R. Snodgrass","18829":"Jack Wilshere","18830":"M. Arnautovi\u0107","18831":"A. Carroll","53645":"P. Pogrebnyak","18833":"Lucas P\u00e9rez","90505":"S. Taylor","90507":"Joleon Lescott","18836":"W. Hennessey","90510":"Shaun Maloney","90511":"Victor Chinedu Anichebe","18839":"S. Dann","18840":"M. Kelly","409":"N. Bentaleb","18842":"M. Sakho","18843":"J. Schlupp","18844":"J. Tomkins","2461":"S. Rond\u00f3n","18846":"A. Wan-Bissaka","18845":"P. van Aanholt","90519":"Ryan Mason","18849":"J. McArthur","47521":"P. Roberts","47522":"Douglas Luiz","328093":"I. Samuels-Smith","328096":"Joel Tshisanga Ndala","18854":"A. Townsend","350625":"J. Meghoma","18857":"C. Wickham","18858":"A. Begovi\u0107","18859":"Artur Boruc","18860":"M. Travers","18861":"N. Ak\u00e9","18862":"N. Clyne","18863":"S. Cook","25004":"S. Ortega","16821":"Ramadan Sobhi","18869":"A. Smith","18873":"R. Fraser","2490":"J. Lerma","18874":"D. Gosling","18876":"Jordon Ibe","47545":"G. Kakuta","18878":"J. Stanislas","18879":"Andrew Surman","47547":"\u00c1lex Moreno","18881":"J. King","18882":"L. Mousset","18883":"D. Solanke","18884":"S. Surridge","18885":"K. Darlow","18886":"M. D\u00fabravka","18887":"R. Elliot","18889":"F. Woodman","18891":"C. Clark","18893":"F. Fern\u00e1ndez","18896":"Javier Manquillo","12753":"M. Fellaini","18897":"D. Yedlin","18898":"M. Diam\u00e9","18899":"I. Hayden","18900":"Ki Sung-Yueng","18901":"S. Longstaff","18902":"Kenedy","18903":"M. Ritchie","18904":"J. Shelvey","18906":"Ayoze P\u00e9rez","18907":"Joselu","18908":"J. Hart","18910":"A. Lindegaard","18911":"N. Pope","18912":"P. Bardsley","90590":"G. Rutter","18914":"B. Gibson","18916":"M. Lowton","18917":"B. Mee","18918":"C. Taylor","18919":"Stephen Robert Ward","18921":"R. Brady","18922":"J. Cork","18924":"J. Hendrick","18925":"A. Lennon","18926":"A. Westwood","18928":"P. Crouch","18929":"D. McNeil","18930":"M. Vydra","18931":"C. Wood","18932":"F. Forster","18933":"A. Gunn","18935":"A. McCarthy","18936":"R. Bertrand","18940":"J. Stephens","18941":"M. Targett","510":"S. Gnabry","18943":"J. Vestergaard","18945":"S. Armstrong","18947":"M. Lemina","18948":"N. Redmond","18949":"Oriol Romeu","18952":"C. Austin","18955":"D. Ings","18956":"S. Long","18957":"M. Obafemi","18958":"D. Button","18959":"Robert S\u00e1nchez","18961":"D. Burn","18962":"S. Duffy","18968":"Y. Bissouma","18972":"A. Knockaert","18977":"D. Stephens","547":"D. van de Beek","18979":"V. Gy\u00f6keres","18982":"G. Murray","18983":"N. Etheridge","18984":"Brian Edward Murphy","18985":"A. Smithies","18987":"J. Bennett","18988":"Matthew Connolly","557":"O. Vlachodimos","18990":"G. Cunningham","18992":"S. Morrison","18994":"L. Peltier","18995":"J. Richards","18996":"H. Arter","18997":"L. Bacuna","18998":"Camarasa","19002":"J. Murphy","6716":"A. Mac Allister","19004":"B. De Cordova-Reid","19005":"K. Zohor\u00e8","19007":"J. Hoilett","19009":"O. Niasse","578":"A. Taarabt","19012":"M. Bettinelli","19016":"C. Chambers","19018":"T. Fosu-Mensah","19020":"Alfie Mawson","19021":"H\u00e5vard Nordtveit","19023":"T. Ream","19028":"L. Markovi\u0107","105044":"Jos\u00e9 Enrique","19031":"A. Sch\u00fcrrle","19032":"R. Sessegnon","8794":"G. Hirst","19034":"R. Babel","19035":"H. Elliott","19038":"B. Hamer","21089":"F\u00e1bio","19043":"T. Kongolo","616":"A. Muri\u0107","19049":"J. Hogg","19050":"A. Mooy","19051":"A. Pritchard","19052":"J. Puncheon","41577":"Nuno Tavares","129643":"E. Ferguson","19055":"K. Ahearne-Grant","626":"J. Stones","627":"K. Walker","2675":"Jos\u00e9 Fonte","629":"K. De Bruyne","630":"F. Delph","2678":"Diogo Jota","19061":"T. Krul","127605":"N. Ferguson","19066":"G. Hanley","635":"R. Mahrez","19070":"M. Aarons","19071":"E. Buend\u00eda","641":"O. Zinchenko","19073":"B. Godfrey","643":"Gabriel Jesus","19076":"J. Lewis","645":"R. Sterling","33413":"Fernando Torres","82563":"Grant Holt","148099":"K. Dewsbury-Hall","649":"J. Denayer","6797":"J. Davidson","162446":"L. Bate","19088":"D. Henderson","19089":"S. Moore","21138":"R. A\u00eft-Nouri","19091":"C. Basham","291476":"D. Fofana","19093":"J. Egan","41621":"Matheus Nunes","19096":"R. Stearman","665":"M. Cornet","19097":"E. Stevens","283289":"A. Raikhy","19100":"K. Dowell","671":"B. Traor\u00e9","2724":"L. Digne","19109":"B. Sharp","2726":"K. Zouma","2727":"J. L\u00f6ssl","2729":"J. Andersen","305834":"Andrey Santos","2731":"M. J\u00f8rgensen","2734":"P. Billing","2735":"P. H\u00f8jbjerg","12975":"O. Ighalo","19119":"L. Davis","49840":"G. Clichy","129711":"B. Johnson","336564":"W. Odobert","2741":"M. Ryan","19127":"A. Forshaw","19128":"J. Harrison","697":"M. Solomon","19129":"Pablo Hern\u00e1ndez","19130":"K. Phillips","162489":"J. Trafford","19134":"P. Bamford","19135":"I. Brown","2752":"M. Luongo","19136":"J. Clarke","19139":"T. Roberts","49861":"Emmanuel Adebayor","49862":"D. Ba","19143":"S. Johnstone","25287":"K. Danso","19145":"T. Adarabioyo","19146":"K. Bartley","19147":"C. Dawson","19148":"K. Gibbs","35533":"E. Valencia","19150":"M. Holgate","301771":"S. Adingra","19152":"C. Townsend","2769":"S. Ajayi","19153":"G. Barry","2771":"O. Aina","111312":"Carlos Cu\u00e9llar","727":"R. Nelson","19160":"J. Livermore","2778":"K. \u1ecaheanach\u1ecd","19164":"M. Phillips","90512":"R. Huth","19166":"D. Gayle","111327":"Tal Ben Haim","19168":"Thomas Henry Alex Robson-Kanu","19169":"J. Rodr\u00edguez","90513":"S. Pienaar","739":"Reguil\u00f3n","19171":"Mark Bunn","49892":"H. Rodallega","19174":"J. Steer","19175":"J. Chester","90514":"Joey  Barton","19177":"K. Hause","19178":"Alan Hutton","2795":"G. Sigur\u00f0sson","19179":"T. Mings","19181":"N. Taylor","19182":"A. Tuanzebe","90515":"V\u00edctor Vald\u00e9s Arribas","19184":"Thomas James Carroll","90516":"Shay Given","6898":"R. De Laet","19186":"Ahmed El Mohamady","19187":"J. Grealish","19190":"H. Lansbury","90517":"P. Robinson","19192":"J. Ramsey","19194":"T. Abraham","19195":"A. El Ghazi","19197":"S. Carson","766":"R. Olsen","103165":"S. Wright-Phillips","19201":"J. Bogle","19204":"C. Davies","19208":"S. Malone","2825":"A. Mitrovi\u0107","19210":"Andre Wisdom","49931":"S. Caulker","780":"S. Nzonzi","19215":"T. Huddlestone","193296":"J. Ngakia","19217":"A. King","19218":"T. Lawrence","106805":"Y. Benayoun","19220":"M. Mount","19221":"H. Wilson","19226":"D. Nugent","19229":"D. Randolph","25374":"K. Wimmer","19233":"Daniel Ayala","19236":"M. Be\u0161i\u0107","19238":"S. Downing","49958":"A. Cissokho","19242":"P. McNair","2859":"S. Larsson","103146":"P. Ramage","2864":"A. Isak","19251":"A. Fletcher","19252":"Rudy Gestede","13109":"S. Aluko","19253":"J. Hugill","19263":"L. Kelly","215874":"T. Cannon","2886":"J. Hern\u00e1ndez","2887":"R. Jim\u00e9nez","25416":"W. Weghorst","842":"N. Vla\u0161i\u0107","19274":"K. Palmer","19281":"A. Semenyo","19284":"C. Pantilimon","19287":"S. Byram","35672":"L. Ulloa","2905":"Lee Chung-Yong","19289":"M. Dawson","37724":"C. Summerville","19294":"J. Robinson","19299":"J. Colback","19301":"A. Gu\u00e9dioura","19303":"Benjamin Watson","2920":"T. Castagne","2921":"M. Demb\u00e9l\u00e9","2922":"L. Dendoncker","2924":"A. Januzaj","19308":"L. Grabban","2926":"Y. Tielemans","2927":"M. Batshuayi","2928":"C. Benteke","19309":"J. Lolley","2930":"J. Butland","883":"Lee Grant","2931":"T. Heaton","2932":"J. Pickford","2933":"B. Chilwell","2934":"M. Keane","888":"P. Jones","889":"V. Lindel\u00f6f","2935":"H. Maguire","891":"L. Shaw","2936":"J. Tarkowski","2937":"D. Rice","894":"A. Young","895":"J. Garner","896":"A. Gomes","2938":"J. Ward-Prowse","2939":"C. Wilson","899":"Andreas Pereira","900":"J. Lingard","901":"Mata","902":"N. Mati\u0107","19326":"L. Fer","19329":"D. James","19331":"C. Roberts","906":"T. Chong","907":"R. Lukaku","19332":"W. Routledge","909":"M. Rashford","910":"A. S\u00e1nchez","19337":"O. McBurnie","912":"Neto","82826":"S. Lappin","27543":"Wilson Roberto Palacios Suazo","19352":"Sergi Can\u00f3s","402329":"A. Heaven","162714":"A. Onana","19357":"J. McEachran","19362":"J. Dasilva","105378":"Clint Dempsey","19364":"N. Maupay","19365":"C. Ogbene","935":"Rodrigo","82855":"T. King","19318":"K. Naughton","2990":"I. Gueye","2991":"C. Kouyat\u00e9","2992":"A. N&apos;Diaye","19319":"M. Olsson","946":"K. Mbabu","105391":"K. Doyle","2997":"\u0141. Fabia\u0144ski","47407":"A. Nyom","2999":"J. Bednarek","50102":"A. Kon\u00e9","19321":"J. Rodon","19387":"B. Bannan","19388":"George Boyd","19390":"David Jones","19393":"J. Onomah","105409":"Kenwyne  Jones","3012":"K. Grosicki","19398":"S. Fletcher","19324":"G. Byers","17355":"Matthew Gilks","19325":"N. Dyer","113614":"L. Jacobsen","19407":"D. Marshall","19408":"R. Burke","105424":"Robbie Keane","978":"K. Havertz","17365":"H. Toffolo","19417":"L. Ridgewell","89051":"Z. Gera","19427":"James Michael Weir","19428":"J. Bowen","19429":"F. Campbell","158694":"T. Livramento","113639":"Dimitar Ivanov Berbatov","48105":"R. Morrison","158697":"J. McAtee","158702":"C. Slicker","21487":"P. Djilobodji","37882":"M. Edwards","21504":"D. Ndong","19461":"L. Nmecha","17414":"Nicholas David Maynard","19462":"C. Robinson","19465":"David Raya","50188":"C. Jerome","15382":"Jordi G\u00f3mez Garc\u00eda-Penche","19480":"H. Reed","19481":"J. Rodwell","19482":"J. Rothwell","19484":"A. Armstrong","19485":"B. Brereton","50207":"G. Obertan","19488":"Danny Graham","3106":"S. Berahino","19491":"A. Federici","87077":"Patrice Evra","19495":"N. Collins","19499":"J. Tymon","19500":"Ashley Williams","19501":"Charles Graham Adam","19502":"J. Allen","19503":"S. Clucas","19504":"Darren  Fletcher","19505":"T. Ince","23600":"E. Grandin","19507":"J. McClean","171058":"H. Ashby","19511":"M. Diouf","19513":"S. Vokes","19514":"Lee Camp","21383":"E. Pieters","19526":"C. Gardner","83018":"S. Sidwell","83019":"Micah Richards","83020":"L. Rosenior","1101":"T. Minamino","83021":"Danny Sean Guthrie","392270":"Marc Guiu","83027":"Rickie Lambert","1108":"D. Boyata","19541":"C. Walton","83032":"Scott Parker","70747":"J. Enciso","19549":"A. Robinson","70752":"A. Alc\u00e1raz","19553":"Darron Gibson","270508":"L. Ugochukwu","19555":"S. MacDonald","1124":"O. Burke","19556":"Callum Henry McManaman","349288":"Vincent Angelini","19562":"N. Powell","1133":"S. Sinclair","1135":"O. \u00c9douard","70775":"R. Santa Cruz","19577":"D. Furlong","1150":"T. Adams","19586":"E. Eze","19592":"L. Freeman","1161":"E. Smith Rowe","1165":"Matheus Cunha","1166":"T. Werner","19599":"E. Mart\u00ednez","19609":"J. O'Shea","1187":"N. Bendtner","19620":"S. Baldock","3247":"W. Zaha","1200":"B. Ivanovi\u0107","383685":"Y. Minteh","83131":"Wes Brown","17597":"D. O&apos;Shea","19645":"R. Tunnicliffe","304317":"T. Dibling","19660":"Billy Jones","115938":"Emmanuel Ebou\u00e9","115943":"J. Carew","330986":"M. Golding","115953":"A. Reid","19698":"Marc David Wilson","115954":"D. Bentley","118007":"D. Shittu","19708":"G. O&apos;Neil","1279":"J. Maja","42246":"W. Bony","19720":"T. Chalobah","115976":"Marcus Hahnemann","19722":"J. Collins","87315":"Kieran  Richardson","1301":"D. N&apos;Doye","19733":"F. Downes","19745":"W. Keane","19750":"J. Shea","19752":"Alexander Aaron John Baptiste","19756":"D. Potts","19760":"J. Justin","19761":"K. LuaLua","87349":"Marouane Chamakh","19767":"P. Mpanzu","83259":"S. Kelly","3389":"S. Sess\u00e8gnon","1347":"V. Moses","50502":"\u00c1lvaro Negredo","19784":"Z. Fryers","144729":"T. Harwood-Bellis","1370":"A. Ayew","144732":"T. Doyle","1374":"I. Slimani","3423":"C. Atsu","19808":"C. Woodrow","3428":"J. Ayew","144741":"L. Moulden","19827":"J. Cullen","130423":"B. Gilmour","152953":"L. Colwill","17795":"Marvin Sordell","152969":"L. Thomas","48528":"Alexandre Dimitri Song-Billong","1427":"A. Sambi Lokonga","93587":"M. van Ginkel","116117":"M. Caicedo","152982":"C. Palmer","1432":"Y. Bolasie","195993":"C. Alcaraz","1436":"Petr \u010cech","1438":"B. Leno","1440":"R. Holding","1441":"C. Jenkinson","1445":"K. Mavropanos","19879":"James Vaughan","1448":"S. Mustafi","206254":"M. Kerkez","1455":"A. Iwobi","7600":"Igor","1456":"A. Maitland-Niles","1457":"H. Mkhitaryan","19892":"D. Love","1461":"Denis Su\u00e1rez","1463":"J. Willock","1464":"G. Xhaka","1465":"P. Aubameyang","19895":"B. Oviedo","1468":"E. Nketiah","1469":"D. Welbeck","42432":"Samuel Eto'o Fils","1473":"Tiago Ilori","1477":"S. Coates","153066":"F\u00e1bio Carvalho","21998":"A. Disasi","19952":"Sebastien Bassong","19959":"B. White","15870":"M. Hermansen","19974":"I. Toney","296458":"D. Jebbison","282125":"R. Lavia","136723":"N. Madueke","1558":"Joel Robles","343576":"B. Doak","19996":"David  Meyler","138780":"N. Williams","118307":"\u0110. Petrovi\u0107","138787":"A. Gordon","181797":"B. Humphreys","15911":"M. Kudus","230960":"J. Dudgeon","11825":"Jean Andr\u00e9 Emanuel Beausejour Coliqueo","50737":"A. Trusty","138806":"B. Williams","138815":"T. Lamptey","11840":"\u00c1. Henr\u00edquez","138816":"I. Maatsen","278079":"A. Ramsey","181827":"C. Egan-Riley","22085":"M. Debuchy","138822":"A. Broja","278085":"S. Edozie","22094":"W. Fofana","1624":"Pepe Reina","18015":"Elliott Ward","50785":"B. Sagna","18025":"D. Vaughan","20079":"H. Souttar","1648":"F. Borini","278133":"Oscar Bobb","329347":"O. Kellyman","22155":"Y. Sanogo","140947":"I. Kabor\u00e9","97943":"James McFadden","138908":"E. Anderson","20126":"J. Sinclair","284324":"A. Garnacho","138931":"J. Philogene","50869":"B. Guzan","138935":"C. Chukwuemeka","26300":"O. Kabak","104129":"Kolo Habib Tour\u00e9","284356":"S. Charles","20167":"J. Donacien","1736":"W. Foderingham","30407":"C. N\u00f8rgaard","1739":"Jonathon Patrick Flanagan","50892":"D. Pereira","1746":"J. Worrall","284372":"C. Doyle","1750":"Graham Dorrans","1758":"J. Defoe","22240":"L. R\u00e9my","18146":"D. Ward","44775":"D. Bachmann","44789":"Y. Mulumbu","87798":"N. Reo-Coker","30455":"G. Ram\u00edrez","284408":"S. Perkins","284409":"D. Mubama","85757":"M. Amalfitano","284414":"R. Mundle","20224":"A. Lonergan","44803":"D. Ball","336585":"Mateus Fernandes","284428":"O. Hutchinson","28434":"D. N&apos;Gog","284439":"L. Sousa","44827":"\u00c1. Bogd\u00e1n","20256":"Aaron Wilbraham","20258":"R. Allsop","87846":"C. Kettings","46899":"Nick Blackman","50999":"M. Turner","5946":"J. Guti\u00e9rrez","57146":"J. Meade","51004":"M. Mancienne","10045":"Diego Cavalieri","270139":"J. O&apos;Brien","104256":"Ji-Sung Park","87873":"J. Thomas","50031":"Armand Traor\u00e9","1864":"Pedro Neto","126791":"N. Broadhead","284492":"L. Hall","44881":"S. Naismith","153425":"L. Dobbin","284500":"T. Iroegbunam","153429":"T. Mengi","153430":"A. Elanga","87896":"P. Konchesky","100187":"J. Elmander","5983":"M. Z\u00e1rate","315237":"W. Osula","51046":"C. Vela","20332":"M. Turner","20340":"M. Kightly","87925":"Jamie O'Hara","104311":"Mark Schwarzer","284539":"H. Graczyk","1917":"M. Balotelli","20355":"A. Ramsdale","51079":"M. Figueroa","1934":"S. Berge","1946":"L. Trossard","20386":"M. Macey","51106":"B. Smith","34739":"J. Mutch","1972":"L. Karius","18357":"R. Johnson","20415":"F. Ladapo","45001":"A. Ferdinand","51146":"V. Mannone","92114":"K. Gork\u0161s","20439":"Matt Jarvis","36846":"Oussama Assaidi","2032":"J. Strand Larsen","51199":"N. Onuoha"},"edges":[[33,49,2024,18],[49,66,2025,18],[49,39,2022,54],[66,1359,2023,76],[38,65,2022,80],[35,47,2022,83],[47,45,2023,83],[47,36,2022,104],[47,60,2016,106],[42,49,2014,108],[47,44,2017,113],[44,47,2017,113],[33,49,2015,119],[47,66,2023,133],[40,66,2021,147],[41,47,2017,158],[47,36,2022,158],[76,47,2014,160],[47,76,2014,160],[76,47,2015,160],[41,47,2015,162],[47,65,2022,163],[76,47,2014,164],[47,76,2014,164],[76,47,2015,164],[47,746,2012,167],[746,47,2013,167],[47,34,2019,167],[34,47,2019,167],[47,38,2021,167],[44,47,2015,169],[47,34,2021,169],[47,41,2019,171],[41,47,2019,171],[47,41,2020,171],[41,48,2025,171],[47,45,2021,172],[45,47,2021,172],[47,45,2022,172],[47,55,2021,174],[55,33,2022,174],[34,47,2016,179],[47,38,2021,179],[38,47,2021,179],[47,46,2024,180],[46,47,2024,180],[41,47,2016,181],[47,46,2024,182],[47,71,2012,184],[71,47,2013,184],[76,47,2017,185],[47,76,2017,185],[76,47,2018,185],[41,42,2019,190],[42,36,2022,190],[36,42,2022,190],[42,66,2024,249],[36,48,2021,253],[40,55,2025,281],[746,40,2013,282],[40,39,2020,285],[41,40,2014,287],[64,40,2017,289],[41,40,2017,290],[40,41,2017,290],[41,40,2018,290],[746,40,2011,292],[40,55,2025,292],[41,40,2014,295],[40,51,2020,295],[51,41,2024,295],[50,66,2010,296],[66,50,2011,296],[50,40,2015,296],[40,51,2023,296],[42,40,2017,297],[40,42,2017,297],[42,40,2018,297],[34,40,2016,300],[40,62,2020,303],[41,40,2016,304],[40,65,2023,305],[49,40,2017,306],[75,40,2018,307],[49,68,2010,308],[68,49,2011,308],[49,40,2012,308],[40,49,2012,308],[49,40,2013,308],[40,60,2017,308],[60,40,2018,308],[47,34,2019,409],[42,60,2015,510],[60,42,2016,510],[33,45,2021,547],[45,33,2022,547],[34,65,2023,557],[65,34,2024,557],[34,65,2024,557],[72,36,2013,578],[36,72,2014,578],[50,44,2023,616],[44,57,2024,616],[45,50,2016,626],[47,66,2010,627],[66,47,2011,627],[47,50,2017,627],[50,44,2023,627],[44,50,2023,627],[50,44,2025,627],[49,50,2015,629],[66,50,2015,630],[50,45,2019,630],[46,50,2018,635],[50,42,2022,641],[42,65,2025,641],[50,42,2022,643],[40,50,2015,645],[50,49,2022,645],[49,42,2024,645],[42,49,2024,645],[50,746,2016,649],[44,48,2022,665],[48,41,2024,665],[41,48,2024,665],[49,66,2020,671],[66,746,2025,671],[36,47,2023,697],[42,36,2024,727],[36,42,2024,727],[42,55,2025,727],[47,33,2023,739],[33,47,2023,739],[47,55,2023,739],[55,33,2024,739],[33,47,2024,739],[45,66,2021,766],[67,75,2012,780],[45,48,2021,842],[75,33,2018,883],[67,33,2011,888],[33,66,2022,889],[66,33,2023,889],[33,66,2023,889],[66,33,2024,889],[33,66,2024,889],[41,33,2014,891],[66,33,2011,894],[33,66,2021,894],[66,45,2023,894],[33,45,2022,895],[33,39,2025,896],[33,36,2022,899],[33,48,2020,900],[48,33,2021,900],[33,65,2022,900],[49,33,2013,901],[33,49,2013,901],[49,33,2014,901],[49,33,2017,902],[33,49,2017,902],[49,33,2018,902],[33,1359,2023,906],[49,60,2012,907],[60,45,2013,907],[45,49,2013,907],[49,45,2014,907],[45,33,2017,907],[33,49,2021,907],[33,66,2024,909],[42,33,2017,910],[33,42,2017,910],[42,33,2018,910],[35,42,2024,912],[68,63,2020,935],[34,36,2022,946],[49,42,2023,978],[40,41,2020,1101],[41,40,2021,1101],[50,68,2011,1108],[68,50,2012,1108],[60,62,2020,1124],[76,50,2012,1133],[50,76,2012,1133],[76,50,2013,1133],[50,60,2013,1133],[60,50,2014,1133],[50,66,2014,1133],[52,46,2024,1135],[46,52,2024,1135],[63,35,2023,1150],[42,36,2023,1161],[36,42,2023,1161],[42,36,2024,1161],[36,42,2024,1161],[42,36,2025,1161],[39,33,2023,1165],[33,39,2023,1165],[39,33,2024,1165],[33,39,2024,1165],[39,33,2025,1165],[49,47,2023,1166],[42,746,2011,1187],[746,42,2012,1187],[49,60,2020,1200],[746,36,2020,1279],[64,746,2015,1301],[61,49,2012,1347],[49,61,2012,1347],[61,40,2013,1347],[40,49,2014,1347],[49,75,2014,1347],[75,48,2015,1347],[48,49,2015,1347],[76,48,2016,1370],[48,76,2017,1370],[76,65,2022,1370],[46,34,2017,1374],[34,46,2017,1374],[42,52,2022,1427],[52,42,2023,1427],[42,1359,2023,1427],[1359,42,2024,1427],[52,45,2016,1432],[45,52,2016,1432],[52,45,2017,1432],[49,42,2015,1436],[42,36,2022,1438],[36,42,2022,1438],[42,36,2023,1438],[42,52,2023,1440],[42,48,2014,1441],[48,42,2016,1441],[42,48,2023,1445],[45,42,2016,1448],[42,45,2019,1455],[45,36,2023,1455],[36,45,2023,1455],[45,36,2024,1455],[42,60,2020,1456],[60,42,2021,1456],[42,41,2022,1456],[41,42,2022,1456],[33,42,2017,1457],[50,42,2018,1461],[42,34,2020,1463],[34,42,2020,1463],[42,34,2021,1463],[34,42,2021,1463],[42,34,2022,1463],[42,746,2025,1464],[42,49,2022,1465],[42,52,2023,1468],[52,42,2024,1468],[42,52,2024,1468],[746,33,2011,1469],[33,42,2014,1469],[42,38,2019,1469],[38,51,2020,1469],[40,66,2015,1473],[40,746,2014,1477],[61,45,2013,1558],[45,63,2022,1558],[40,66,2019,1624],[49,40,2012,1648],[40,746,2013,1648],[746,40,2014,1648],[40,746,2015,1648],[62,48,2024,1736],[40,44,2016,1739],[44,40,2017,1739],[65,44,2023,1746],[44,65,2023,1746],[65,44,2025,1746],[60,71,2015,1750],[47,746,2014,1758],[746,35,2017,1758],[39,49,2024,1864],[50,40,2014,1917],[62,44,2023,1934],[44,62,2023,1934],[62,36,2024,1934],[51,42,2022,1946],[42,51,2022,1946],[51,42,2023,1946],[40,34,2022,1972],[39,52,2025,2032],[34,64,2014,2205],[38,52,2024,2218],[49,35,2024,2273],[35,42,2024,2273],[42,49,2024,2273],[49,42,2025,2273],[50,49,2017,2275],[49,41,2021,2275],[48,72,2012,2277],[72,37,2017,2277],[68,746,2013,2278],[746,49,2016,2278],[49,62,2020,2279],[62,49,2021,2279],[49,63,2025,2279],[68,49,2011,2281],[49,68,2011,2281],[68,49,2012,2281],[49,52,2019,2281],[52,35,2022,2281],[49,42,2019,2283],[42,49,2019,2283],[49,42,2020,2283],[49,48,2022,2284],[48,49,2022,2284],[49,48,2023,2284],[45,49,2017,2287],[49,66,2020,2287],[66,49,2021,2287],[49,1359,2023,2287],[1359,66,2024,2287],[46,49,2017,2288],[49,44,2019,2288],[44,66,2019,2288],[66,49,2022,2288],[49,42,2022,2289],[42,49,2022,2289],[49,42,2023,2289],[46,49,2016,2290],[49,50,2023,2291],[49,52,2017,2292],[52,49,2018,2292],[49,36,2020,2292],[36,49,2020,2292],[49,42,2020,2294],[42,36,2022,2294],[42,49,2017,2295],[49,65,2023,2298],[38,45,2018,2413],[45,47,2022,2413],[60,34,2018,2461],[34,45,2021,2461],[35,52,2023,2490],[41,48,2016,2675],[39,40,2020,2678],[45,66,2021,2724],[49,75,2017,2726],[75,45,2018,2726],[45,49,2019,2726],[49,48,2021,2726],[48,49,2021,2726],[49,48,2022,2726],[37,45,2019,2727],[45,55,2021,2727],[36,52,2021,2729],[52,36,2024,2729],[36,52,2024,2729],[52,36,2025,2729],[37,55,2021,2731],[37,35,2019,2734],[41,47,2020,2735],[51,42,2020,2741],[42,51,2020,2741],[47,57,2024,2752],[42,60,2020,2769],[49,36,2020,2771],[36,65,2023,2771],[50,46,2017,2778],[46,50,2017,2778],[50,46,2018,2778],[76,47,2012,2795],[47,76,2014,2795],[76,45,2017,2795],[45,76,2017,2795],[76,45,2018,2795],[34,36,2018,2825],[54,746,2011,2859],[34,40,2025,2864],[33,48,2017,2886],[39,36,2023,2887],[36,39,2023,2887],[39,36,2024,2887],[68,52,2014,2905],[46,36,2023,2920],[36,47,2012,2921],[39,66,2022,2922],[33,746,2016,2924],[46,66,2023,2926],[49,52,2018,2927],[52,49,2019,2927],[49,52,2020,2927],[52,49,2022,2927],[66,40,2015,2928],[40,52,2016,2928],[75,52,2020,2930],[52,33,2022,2930],[33,52,2022,2930],[44,66,2019,2931],[66,33,2021,2931],[746,45,2017,2932],[46,49,2020,2933],[49,52,2024,2933],[33,44,2014,2934],[44,45,2017,2934],[64,46,2017,2935],[46,33,2019,2935],[44,45,2022,2936],[48,42,2023,2937],[42,48,2023,2937],[48,42,2024,2937],[41,48,2023,2938],[48,65,2024,2938],[65,44,2025,2938],[44,48,2025,2938],[35,34,2020,2939],[34,48,2025,2939],[66,45,2016,2990],[48,52,2018,2991],[52,65,2022,2991],[746,64,2016,2992],[42,76,2014,2997],[76,48,2018,2997],[41,66,2022,2999],[66,41,2024,2999],[64,60,2020,3012],[60,75,2016,3106],[33,43,2013,3247],[43,33,2014,3247],[33,52,2014,3247],[746,60,2013,3389],[60,746,2013,3389],[746,60,2014,3389],[45,35,2015,3423],[35,34,2017,3423],[66,76,2016,3428],[76,52,2018,3428],[52,46,2024,3428],[46,52,2024,3428],[34,71,2013,5946],[71,34,2014,5946],[48,72,2014,5983],[72,48,2015,5983],[48,38,2016,5983],[51,40,2023,6716],[60,37,2017,6797],[71,46,2014,6898],[51,48,2025,7600],[48,51,2025,7600],[71,64,2016,8465],[46,57,2024,8794],[40,52,2017,10045],[38,49,2023,10329],[49,51,2023,10329],[51,49,2024,10329],[49,51,2024,10329],[51,49,2025,10329],[54,61,2011,11825],[33,61,2012,11840],[45,64,2013,12464],[64,48,2015,12464],[45,33,2013,12753],[33,45,2013,12753],[45,33,2014,12753],[38,33,2019,12975],[64,57,2024,13109],[61,746,2014,15382],[46,48,2025,15870],[48,47,2025,15911],[75,37,2018,16821],[1356,44,2014,17355],[71,65,2022,17365],[48,43,2013,17414],[60,44,2023,17597],[44,57,2024,17597],[68,44,2014,17795],[71,35,2015,18015],[1356,746,2011,18025],[40,46,2018,18146],[54,39,2011,18357],[39,48,2013,18357],[62,45,2024,18592],[39,44,2020,18736],[71,39,2018,18737],[39,34,2024,18737],[71,39,2018,18738],[39,46,2019,18738],[39,65,2022,18739],[40,39,2018,18741],[39,45,2022,18741],[45,46,2024,18741],[39,47,2020,18742],[47,39,2023,18742],[39,48,2024,18744],[39,45,2022,18745],[39,65,2022,18746],[39,1359,2023,18747],[39,36,2020,18751],[39,63,2020,18752],[66,70,2016,18753],[70,39,2018,18753],[39,36,2023,18753],[36,39,2023,18753],[39,36,2024,18753],[36,48,2025,18753],[36,41,2015,18756],[41,45,2016,18756],[45,62,2019,18759],[45,62,2023,18762],[61,45,2013,18763],[45,52,2019,18763],[41,33,2015,18764],[33,45,2016,18764],[45,63,2025,18766],[45,36,2020,18767],[36,46,2021,18767],[45,52,2019,18768],[52,45,2020,18768],[42,45,2017,18769],[45,41,2020,18769],[41,45,2020,18769],[45,41,2021,18769],[64,46,2017,18770],[46,45,2022,18770],[33,60,2015,18772],[60,46,2018,18772],[46,33,2023,18772],[34,46,2014,18775],[46,72,2014,18775],[72,46,2015,18775],[66,46,2014,18777],[46,34,2023,18778],[46,45,2021,18781],[46,47,2023,18784],[47,38,2015,18789],[54,60,2011,18791],[60,38,2018,18791],[1356,38,2015,18793],[34,38,2016,18796],[53,52,2013,18798],[52,38,2016,18798],[47,38,2015,18802],[49,44,2014,18803],[44,49,2015,18803],[49,38,2017,18803],[38,36,2022,18803],[61,33,2011,18804],[33,66,2014,18804],[66,45,2015,18804],[45,38,2016,18804],[38,45,2016,18804],[45,38,2017,18804],[38,45,2020,18805],[38,52,2021,18806],[48,38,2018,18807],[45,38,2017,18809],[44,38,2017,18810],[38,44,2017,18810],[44,38,2018,18810],[48,40,2019,18812],[48,36,2022,18814],[36,48,2022,18814],[48,36,2023,18814],[47,48,2018,18815],[48,35,2022,18815],[48,746,2025,18816],[50,48,2017,18818],[48,60,2020,18821],[48,57,2024,18823],[42,50,2011,18825],[50,48,2018,18825],[66,48,2018,18827],[71,64,2014,18828],[64,48,2016,18828],[48,64,2016,18828],[64,48,2017,18828],[48,60,2020,18828],[42,35,2016,18829],[35,42,2016,18829],[42,48,2018,18829],[75,48,2017,18830],[34,40,2010,18831],[40,48,2012,18831],[48,34,2019,18831],[42,48,2018,18833],[39,52,2013,18836],[52,44,2021,18836],[44,65,2022,18836],[54,67,2011,18839],[67,52,2013,18839],[40,52,2014,18840],[40,52,2016,18842],[52,40,2017,18842],[40,52,2017,18842],[46,52,2016,18843],[48,52,2016,18844],[49,61,2011,18845],[61,746,2014,18845],[746,52,2016,18845],[52,746,2016,18845],[746,52,2017,18845],[52,33,2019,18846],[33,48,2024,18846],[61,52,2014,18849],[47,72,2012,18854],[72,47,2013,18854],[47,34,2015,18854],[34,47,2015,18854],[47,52,2016,18854],[52,45,2021,18854],[45,1359,2023,18854],[746,52,2015,18857],[75,49,2015,18858],[49,35,2017,18858],[35,45,2021,18858],[41,35,2015,18859],[35,45,2023,18860],[45,35,2024,18860],[35,45,2024,18860],[49,38,2015,18861],[38,35,2016,18861],[35,49,2016,18861],[49,35,2017,18861],[35,50,2020,18861],[41,40,2015,18862],[40,35,2018,18862],[35,40,2018,18862],[40,52,2020,18862],[35,65,2022,18863],[47,35,2015,18869],[35,34,2020,18873],[34,41,2024,18873],[34,35,2015,18874],[35,38,2021,18874],[40,35,2016,18876],[48,35,2015,18878],[71,35,2015,18879],[33,35,2015,18881],[35,45,2020,18881],[45,38,2021,18881],[35,62,2019,18882],[49,40,2017,18883],[40,35,2018,18883],[35,47,2024,18883],[35,65,2022,18884],[34,63,2025,18885],[34,33,2022,18886],[33,34,2022,18886],[34,44,2025,18886],[34,38,2021,18887],[34,40,2025,18889],[66,34,2017,18891],[34,62,2023,18891],[76,34,2018,18893],[40,746,2016,18896],[746,34,2017,18896],[47,746,2015,18897],[746,34,2017,18897],[61,48,2012,18898],[48,64,2014,18898],[64,34,2017,18898],[42,34,2017,18899],[76,746,2013,18900],[746,76,2014,18900],[76,34,2018,18900],[34,63,2025,18901],[49,38,2016,18902],[38,49,2016,18902],[49,34,2017,18902],[34,49,2017,18902],[49,34,2018,18902],[34,49,2019,18902],[35,34,2017,18903],[40,76,2013,18904],[76,34,2015,18904],[34,76,2015,18904],[76,34,2017,18904],[34,65,2022,18904],[34,46,2019,18906],[75,34,2017,18907],[50,48,2017,18908],[48,44,2018,18908],[44,47,2020,18908],[33,60,2015,18910],[60,44,2017,18910],[44,34,2022,18911],[746,75,2014,18912],[75,44,2017,18912],[70,44,2018,18914],[44,71,2021,18914],[66,44,2016,18916],[44,55,2022,18917],[44,41,2024,18918],[39,44,2014,18919],[33,64,2013,18921],[64,71,2015,18921],[71,44,2016,18921],[41,76,2014,18922],[76,44,2017,18922],[44,34,2020,18924],[47,45,2014,18925],[45,47,2014,18925],[47,45,2015,18925],[45,47,2015,18925],[47,45,2016,18925],[45,44,2017,18925],[44,45,2017,18925],[45,44,2018,18925],[66,44,2016,18926],[47,75,2011,18928],[75,44,2018,18928],[44,45,2022,18929],[60,38,2015,18930],[38,44,2018,18930],[60,46,2014,18931],[46,44,2017,18931],[44,34,2021,18931],[34,44,2021,18931],[44,34,2022,18931],[34,65,2022,18931],[34,41,2014,18932],[41,47,2022,18932],[47,35,2025,18932],[50,41,2018,18933],[41,71,2021,18933],[71,65,2025,18933],[53,72,2014,18935],[72,52,2015,18935],[52,41,2016,18935],[49,66,2013,18936],[66,41,2014,18936],[41,46,2021,18936],[41,35,2022,18940],[35,41,2022,18940],[41,66,2019,18941],[66,34,2021,18941],[34,66,2021,18941],[66,34,2022,18941],[41,46,2021,18943],[41,55,2024,18945],[41,36,2020,18947],[36,39,2022,18947],[54,71,2013,18948],[71,41,2016,18948],[41,44,2023,18948],[49,41,2015,18949],[72,41,2015,18952],[41,60,2020,18952],[44,40,2015,18955],[40,41,2018,18955],[41,66,2021,18955],[66,48,2022,18955],[48,66,2022,18955],[66,48,2023,18955],[60,64,2013,18956],[64,41,2014,18956],[41,44,2023,18957],[51,60,2020,18958],[51,49,2023,18959],[49,51,2023,18959],[51,49,2024,18959],[36,51,2018,18961],[51,34,2021,18961],[34,51,2021,18961],[51,34,2022,18961],[45,51,2017,18962],[51,36,2022,18962],[36,51,2022,18962],[51,47,2022,18968],[46,51,2017,18972],[51,36,2020,18972],[51,44,2020,18977],[44,51,2020,18977],[51,44,2021,18977],[51,42,2025,18979],[52,35,2015,18982],[35,52,2015,18982],[52,51,2017,18982],[36,43,2018,18983],[72,43,2018,18984],[43,46,2022,18985],[66,35,2015,18987],[35,66,2015,18987],[66,43,2018,18987],[72,43,2013,18988],[50,43,2018,18990],[53,43,2018,18992],[43,60,2020,18994],[76,43,2018,18995],[35,43,2018,18996],[43,65,2022,18996],[66,43,2018,18997],[43,52,2019,18998],[71,43,2018,19002],[43,36,2020,19004],[36,46,2024,19004],[43,60,2020,19005],[67,72,2012,19007],[72,43,2018,19007],[45,64,2016,19009],[64,45,2017,19009],[45,43,2018,19009],[43,45,2018,19009],[36,49,2021,19012],[49,50,2025,19012],[41,42,2014,19016],[42,70,2016,19016],[70,42,2017,19016],[42,36,2018,19016],[36,42,2018,19016],[42,66,2021,19016],[33,52,2017,19018],[52,36,2018,19018],[36,33,2019,19018],[76,36,2018,19020],[48,36,2018,19021],[68,36,2018,19023],[40,64,2016,19028],[64,36,2018,19028],[49,36,2018,19031],[36,47,2019,19032],[47,36,2024,19032],[36,47,2024,19032],[47,36,2025,19032],[40,36,2018,19034],[36,40,2019,19035],[40,66,2025,19035],[46,37,2018,19038],[37,36,2020,19043],[66,37,2017,19049],[37,51,2019,19050],[47,60,2015,19051],[60,37,2017,19051],[1356,72,2011,19052],[72,41,2012,19052],[41,52,2013,19052],[52,37,2018,19052],[37,52,2018,19052],[37,60,2020,19055],[34,51,2017,19061],[51,71,2019,19061],[71,1359,2023,19061],[67,34,2017,19066],[34,71,2019,19066],[71,35,2023,19070],[71,66,2021,19071],[71,45,2020,19073],[45,57,2024,19073],[71,34,2020,19076],[62,33,2020,19088],[33,52,2022,19088],[52,65,2022,19088],[65,33,2023,19088],[33,52,2023,19088],[43,62,2019,19089],[62,746,2025,19089],[1356,62,2019,19091],[746,62,2019,19093],[39,62,2019,19096],[66,62,2019,19097],[45,71,2021,19100],[41,62,2019,19109],[63,57,2024,19119],[45,70,2016,19127],[70,63,2020,19127],[63,45,2023,19128],[45,63,2025,19128],[76,63,2020,19129],[63,50,2022,19130],[50,48,2023,19130],[48,50,2023,19130],[50,48,2024,19130],[48,50,2024,19130],[50,57,2024,19130],[52,71,2015,19134],[71,44,2016,19134],[44,49,2016,19134],[49,70,2016,19134],[70,63,2020,19134],[60,49,2014,19135],[49,51,2017,19135],[47,57,2024,19136],[60,63,2020,19139],[33,60,2020,19143],[60,52,2022,19143],[52,39,2024,19143],[39,52,2024,19143],[52,39,2025,19143],[50,36,2020,19145],[36,49,2024,19145],[42,76,2012,19146],[76,60,2020,19146],[60,38,2019,19147],[38,48,2020,19147],[48,39,2022,19147],[39,48,2022,19147],[48,39,2023,19147],[42,60,2017,19148],[45,62,2023,19150],[62,45,2024,19150],[60,57,2024,19152],[50,45,2013,19153],[45,50,2013,19153],[50,45,2014,19153],[45,60,2017,19153],[47,64,2013,19160],[64,60,2016,19160],[60,64,2016,19160],[64,60,2017,19160],[1356,72,2014,19164],[72,60,2016,19164],[52,34,2017,19166],[53,60,2016,19168],[41,60,2017,19169],[60,44,2019,19169],[67,71,2012,19171],[71,66,2015,19171],[71,66,2013,19174],[64,60,2015,19175],[60,66,2019,19175],[39,66,2019,19177],[47,66,2011,19178],[35,66,2019,19179],[76,66,2019,19181],[33,66,2021,19182],[66,33,2022,19182],[33,57,2024,19182],[57,44,2025,19182],[47,76,2014,19184],[76,47,2015,19184],[47,76,2016,19184],[746,64,2013,19186],[64,66,2019,19186],[66,50,2021,19187],[50,45,2025,19187],[42,66,2019,19190],[66,34,2023,19192],[34,66,2023,19192],[66,34,2024,19192],[34,66,2024,19192],[66,34,2025,19192],[49,76,2017,19194],[76,49,2018,19194],[49,66,2025,19194],[66,45,2021,19195],[45,66,2021,19195],[60,50,2019,19197],[62,63,2025,19201],[54,66,2010,19204],[66,64,2013,19204],[39,37,2017,19208],[40,60,2014,19210],[60,71,2015,19210],[47,64,2013,19215],[46,76,2017,19217],[33,46,2014,19218],[49,33,2023,19220],[40,35,2019,19221],[35,36,2022,19221],[46,70,2016,19226],[48,35,2022,19229],[35,48,2022,19229],[48,35,2023,19229],[40,71,2011,19233],[71,70,2016,19233],[45,62,2019,19236],[62,45,2020,19236],[66,40,2011,19238],[40,48,2013,19238],[48,70,2016,19238],[33,746,2016,19242],[48,38,2021,19251],[43,66,2015,19252],[66,70,2016,19252],[48,71,2021,19253],[35,34,2024,19263],[34,35,2024,19263],[49,37,2017,19274],[35,50,2025,19281],[50,746,2014,19284],[746,38,2015,19284],[38,746,2015,19284],[746,38,2016,19284],[48,71,2019,19287],[71,63,2025,19287],[47,64,2014,19289],[40,62,2019,19294],[746,34,2014,19299],[34,65,2022,19299],[39,52,2013,19301],[52,38,2015,19301],[38,70,2016,19301],[61,38,2015,19303],[35,71,2015,19308],[71,35,2016,19308],[35,65,2022,19308],[37,65,2022,19309],[47,71,2011,19318],[71,47,2012,19318],[47,76,2014,19318],[67,71,2013,19319],[71,76,2016,19319],[76,47,2020,19321],[47,63,2025,19321],[38,76,2017,19324],[76,46,2015,19325],[46,76,2015,19325],[71,72,2014,19326],[72,76,2015,19326],[76,33,2019,19329],[33,63,2021,19329],[63,36,2022,19329],[36,63,2022,19329],[76,44,2021,19331],[34,76,2011,19332],[76,62,2019,19337],[40,55,2021,19352],[49,76,2011,19357],[76,49,2012,19357],[42,55,2021,19362],[51,45,2022,19364],[45,51,2022,19364],[51,45,2023,19364],[45,55,2023,19364],[55,45,2024,19364],[45,55,2024,19364],[1359,57,2024,19365],[66,52,2013,19387],[52,66,2013,19387],[66,52,2014,19387],[64,44,2014,19388],[44,64,2014,19388],[64,44,2016,19388],[39,61,2011,19390],[61,44,2014,19390],[47,36,2020,19393],[39,746,2012,19398],[43,64,2016,19407],[48,1359,2023,19408],[54,60,2011,19417],[33,64,2016,19427],[64,48,2019,19428],[746,43,2013,19429],[43,52,2014,19429],[50,63,2025,19461],[66,62,2019,19462],[62,60,2020,19462],[55,42,2023,19465],[42,55,2023,19465],[55,42,2024,19465],[42,55,2024,19465],[55,42,2025,19465],[41,36,2020,19480],[45,50,2012,19481],[50,746,2014,19481],[746,62,2019,19481],[33,35,2022,19482],[35,41,2024,19482],[34,41,2021,19484],[41,39,2025,19484],[62,41,2024,19485],[76,746,2012,19488],[746,64,2013,19488],[64,746,2014,19488],[53,35,2015,19491],[44,39,2022,19495],[39,55,2023,19495],[64,75,2017,19499],[76,45,2016,19500],[45,76,2016,19500],[76,45,2017,19500],[1356,40,2011,19501],[40,75,2012,19501],[76,40,2012,19502],[40,75,2016,19502],[64,76,2017,19503],[33,60,2014,19504],[60,75,2017,19504],[40,52,2013,19505],[52,64,2014,19505],[64,37,2017,19505],[746,60,2015,19507],[67,33,2011,19511],[33,75,2014,19511],[39,44,2014,19513],[71,60,2013,19514],[60,35,2015,19514],[35,43,2018,19514],[54,746,2011,19526],[746,60,2014,19526],[51,57,2024,19541],[45,36,2020,19549],[33,45,2011,19553],[45,746,2016,19553],[76,35,2015,19555],[61,60,2014,19556],[33,46,2014,19562],[46,33,2015,19562],[72,60,2020,19577],[52,42,2025,19586],[42,52,2025,19586],[62,1359,2023,19592],[42,66,2020,19599],[33,746,2011,19609],[48,51,2017,19620],[33,36,2013,19645],[60,746,2014,19660],[75,35,2016,19698],[35,60,2016,19698],[60,75,2016,19698],[48,71,2015,19708],[49,52,2024,19720],[52,49,2025,19720],[66,48,2012,19722],[48,66,2012,19722],[66,48,2013,19722],[48,41,2024,19733],[41,48,2024,19733],[33,64,2016,19745],[42,1359,2023,19750],[1356,70,2016,19752],[48,1359,2023,19756],[46,63,2025,19760],[34,51,2017,19761],[48,1359,2023,19767],[33,47,2013,19784],[47,52,2014,19784],[36,1359,2023,19808],[48,44,2023,19827],[45,71,2011,19879],[33,746,2016,19892],[45,746,2016,19895],[47,39,2011,19952],[39,47,2011,19952],[47,71,2012,19952],[51,42,2021,19959],[34,55,2021,19974],[746,64,2013,19996],[75,46,2022,20079],[40,38,2016,20126],[66,57,2024,20167],[40,60,2020,20224],[60,45,2021,20224],[71,52,2013,20256],[60,35,2015,20258],[746,71,2012,20332],[39,75,2012,20340],[75,44,2014,20340],[35,62,2020,20355],[62,42,2021,20355],[42,41,2024,20355],[41,42,2024,20355],[42,34,2025,20355],[42,1359,2023,20386],[52,57,2024,20415],[39,48,2012,20439],[48,71,2015,20439],[39,72,2014,20500],[55,33,2025,20589],[55,34,2025,20649],[33,72,2012,21089],[72,33,2013,21089],[33,43,2013,21089],[43,70,2016,21089],[39,50,2023,21138],[50,39,2024,21138],[39,50,2024,21138],[75,44,2019,21383],[49,746,2016,21487],[746,38,2017,21504],[49,66,2024,21998],[66,48,2025,21998],[34,42,2014,22085],[46,49,2022,22094],[42,52,2014,22155],[52,42,2016,22155],[72,34,2013,22240],[34,49,2014,22240],[49,72,2014,22240],[72,49,2015,22240],[49,52,2016,22240],[52,49,2017,22240],[1356,52,2013,23600],[47,36,2013,24876],[36,47,2013,24876],[65,45,2024,24882],[45,65,2024,24882],[42,68,2011,24939],[68,61,2012,24939],[61,42,2013,24939],[50,65,2025,25004],[41,47,2024,25287],[47,75,2017,25374],[44,33,2022,25416],[33,44,2023,25416],[40,71,2021,26300],[33,72,2011,26759],[72,33,2012,26759],[47,75,2011,27543],[40,68,2011,28434],[68,76,2013,28434],[55,42,2025,30407],[41,64,2014,30455],[64,41,2015,30455],[41,70,2016,30455],[48,38,2015,30805],[47,72,2014,30813],[72,60,2015,30813],[48,38,2015,30968],[40,49,2010,33413],[54,43,2013,34739],[43,52,2014,34739],[52,72,2014,34739],[72,52,2015,34739],[48,45,2016,35533],[45,48,2016,35533],[46,51,2017,35672],[40,75,2013,36846],[40,55,2024,36922],[41,45,2017,37146],[63,35,2023,37161],[42,33,2012,37162],[33,42,2012,37162],[42,33,2013,37162],[63,48,2024,37724],[47,44,2025,37882],[33,43,2013,39049],[36,47,2025,41104],[42,65,2023,41577],[65,42,2024,41577],[42,65,2024,41577],[39,50,2023,41621],[76,50,2014,42246],[50,76,2014,42246],[76,50,2015,42246],[50,75,2016,42246],[75,76,2017,42246],[49,45,2014,42432],[75,38,2017,44775],[60,71,2015,44789],[47,57,2024,44803],[68,40,2015,44827],[45,71,2015,44881],[746,72,2011,45001],[72,746,2011,45001],[746,72,2012,45001],[76,52,2013,45306],[67,53,2012,46899],[42,71,2015,47253],[42,52,2016,47261],[34,42,2024,47311],[76,66,2019,47370],[50,75,2013,47371],[75,50,2014,47371],[51,49,2022,47380],[49,51,2022,47380],[51,49,2023,47380],[38,60,2016,47407],[36,50,2015,47521],[50,71,2019,47521],[71,746,2025,47521],[66,65,2025,47522],[65,66,2025,47522],[36,49,2010,47545],[49,68,2011,47545],[66,65,2024,47547],[65,66,2024,47547],[33,48,2013,48105],[48,62,2019,48105],[42,48,2014,48528],[42,50,2011,49840],[50,47,2011,49861],[47,50,2011,49861],[50,47,2012,49861],[47,50,2012,49861],[50,47,2013,49861],[47,52,2015,49861],[48,34,2011,49862],[34,49,2012,49862],[61,36,2012,49892],[76,47,2012,49931],[47,43,2013,49931],[43,72,2014,49931],[72,40,2015,49931],[40,41,2015,49931],[40,66,2014,49958],[42,72,2011,50031],[61,45,2013,50102],[54,75,2011,50188],[75,52,2013,50188],[52,75,2013,50188],[75,71,2015,50188],[33,34,2011,50207],[50,70,2016,50502],[42,62,2023,50737],[42,50,2014,50785],[66,70,2016,50869],[38,1359,2023,50892],[42,65,2023,50999],[65,52,2024,50999],[52,65,2024,50999],[39,49,2010,51004],[42,60,2010,51046],[61,64,2013,51079],[40,35,2016,51106],[42,746,2013,51146],[746,50,2011,51199],[50,72,2011,51199],[36,53,2012,53645],[42,76,2013,57146],[49,52,2021,67971],[52,50,2025,67971],[50,52,2025,67971],[60,52,2021,67972],[52,49,2022,67972],[49,47,2025,67972],[51,57,2024,70747],[61,45,2013,70752],[50,67,2010,70775],[67,50,2011,70775],[75,44,2017,81993],[66,746,2010,82011],[746,66,2011,82011],[66,36,2013,82011],[36,66,2013,82011],[36,60,2014,82017],[33,36,2013,82062],[60,71,2011,82079],[60,57,2024,82097],[67,71,2015,82098],[34,52,2014,82138],[45,60,2016,82140],[48,52,2019,82227],[1356,46,2014,82307],[71,66,2013,82563],[71,43,2013,82826],[39,45,2024,82855],[36,66,2010,83018],[66,36,2011,83018],[36,75,2014,83018],[75,51,2017,83018],[50,66,2015,83019],[64,51,2017,83020],[34,53,2012,83021],[41,40,2014,83027],[40,60,2015,83027],[48,47,2011,83032],[47,36,2013,83032],[36,47,2013,83032],[33,746,2011,83131],[36,53,2012,83259],[60,48,2014,85757],[33,48,2017,87077],[746,36,2012,87315],[36,746,2012,87315],[746,36,2013,87315],[36,66,2014,87315],[42,48,2012,87349],[48,52,2013,87349],[66,68,2011,87798],[1356,52,2014,87846],[60,52,2013,87873],[36,40,2010,87896],[40,46,2014,87896],[39,47,2010,87925],[47,39,2011,87925],[36,60,2011,89051],[34,52,2015,90488],[40,75,2015,90491],[34,66,2010,90492],[66,75,2013,90492],[50,45,2017,90498],[45,50,2017,90498],[47,746,2015,90503],[746,38,2016,90503],[38,746,2016,90503],[746,38,2017,90503],[50,53,2012,90505],[53,41,2016,90505],[50,60,2014,90507],[60,66,2015,90507],[66,746,2016,90507],[61,64,2016,90510],[45,60,2013,90511],[60,746,2016,90511],[75,46,2014,90512],[46,75,2014,90512],[75,46,2015,90512],[45,47,2010,90513],[47,45,2011,90513],[45,47,2011,90513],[47,45,2012,90513],[45,746,2016,90513],[34,72,2011,90514],[72,44,2016,90514],[33,70,2016,90515],[50,66,2011,90516],[66,75,2015,90516],[67,44,2016,90517],[47,64,2016,90519],[63,51,2024,90590],[72,53,2012,92114],[49,75,2015,93587],[54,45,2011,97943],[45,746,2012,97943],[40,36,2011,98466],[68,71,2013,100187],[36,75,2010,100486],[40,48,2012,102748],[48,66,2014,102748],[72,52,2013,103146],[50,72,2011,103165],[50,40,2013,104129],[33,72,2012,104256],[36,49,2013,104311],[49,46,2014,104311],[46,49,2014,104311],[49,46,2015,104311],[39,42,2011,104629],[42,36,2012,104629],[36,42,2012,104629],[47,72,2014,104745],[36,66,2014,104780],[34,40,2011,105044],[36,47,2012,105378],[47,36,2013,105378],[39,52,2014,105391],[75,43,2013,105409],[43,75,2013,105409],[47,48,2010,105424],[48,47,2011,105424],[47,66,2011,105424],[49,42,2011,106805],[42,49,2011,106805],[49,48,2012,106805],[48,49,2012,106805],[66,746,2012,111312],[48,72,2012,111327],[48,67,2010,113614],[33,36,2012,113639],[34,48,2012,114743],[50,746,2012,114744],[45,42,2011,114745],[42,45,2011,114745],[45,42,2012,114745],[45,35,2015,114747],[41,46,2014,114748],[36,52,2014,114751],[61,66,2011,114752],[66,72,2014,114757],[60,44,2014,114759],[34,64,2013,114760],[64,746,2015,114760],[36,72,2011,114761],[48,75,2011,114763],[75,46,2014,114763],[33,72,2014,114764],[68,48,2012,114765],[36,72,2012,114768],[72,52,2014,114768],[49,60,2013,114772],[40,50,2011,114773],[50,40,2012,114773],[40,43,2013,114773],[53,52,2013,114779],[72,43,2013,114789],[54,52,2013,114790],[52,46,2014,114790],[75,64,2013,114792],[36,48,2013,114793],[75,71,2013,114794],[45,71,2013,114797],[40,49,2011,114800],[49,72,2012,114806],[67,53,2012,114811],[48,45,2012,114812],[53,35,2015,114813],[33,75,2012,114815],[47,66,2011,114817],[66,47,2012,114817],[47,72,2012,114817],[45,47,2011,114820],[47,746,2012,114820],[48,72,2011,114822],[60,53,2012,114829],[1356,72,2011,114836],[60,61,2012,114839],[66,72,2011,114850],[47,75,2011,114854],[45,67,2011,114862],[75,68,2011,114863],[67,60,2011,114877],[60,67,2011,114877],[48,50,2010,114879],[50,746,2011,114879],[67,72,2011,114881],[33,50,2011,114895],[40,746,2011,114902],[42,746,2015,115938],[66,75,2010,115943],[746,1356,2010,115953],[47,54,2010,115954],[54,47,2011,115954],[39,45,2011,115976],[51,49,2023,116117],[49,51,2023,116117],[51,49,2024,116117],[68,72,2011,118007],[49,35,2025,118307],[45,57,2024,126791],[60,52,2020,127605],[51,48,2024,129643],[48,51,2024,129643],[65,47,2023,129711],[47,65,2023,129711],[65,47,2024,129711],[47,52,2025,129711],[49,71,2021,130423],[71,49,2022,130423],[49,51,2022,130423],[49,42,2025,136723],[66,62,2023,137302],[62,66,2023,137302],[66,41,2024,137302],[41,66,2024,137302],[52,66,2025,137303],[40,65,2022,138780],[45,34,2022,138787],[34,45,2022,138787],[45,34,2023,138787],[33,71,2021,138806],[71,33,2022,138806],[33,57,2024,138806],[49,51,2019,138815],[49,66,2023,138816],[49,41,2021,138822],[41,49,2022,138822],[49,36,2023,138822],[36,49,2023,138822],[49,36,2024,138822],[36,45,2024,138822],[45,49,2024,138822],[49,44,2025,138822],[34,65,2023,138908],[65,34,2024,138908],[34,65,2024,138908],[66,57,2024,138931],[57,66,2024,138931],[66,49,2022,138935],[49,66,2022,138935],[66,49,2023,138935],[50,1359,2023,140947],[1359,50,2024,140947],[50,41,2024,144729],[41,50,2024,144729],[50,39,2023,144732],[39,50,2023,144732],[50,39,2024,144732],[39,52,2024,144741],[71,65,2023,147835],[46,49,2024,148099],[49,45,2025,148099],[51,49,2023,152953],[46,62,2023,152969],[62,46,2024,152969],[50,49,2023,152982],[49,50,2023,152982],[50,49,2024,152982],[36,40,2022,153066],[40,55,2024,153066],[45,66,2024,153425],[33,1359,2023,153429],[33,34,2022,153430],[34,33,2023,153430],[33,34,2023,153430],[34,65,2023,153430],[65,34,2024,153430],[34,65,2024,153430],[65,34,2025,153430],[49,41,2021,158694],[41,34,2022,158694],[34,41,2022,158694],[41,34,2023,158694],[50,62,2023,158697],[62,50,2024,158697],[50,65,2025,158697],[50,57,2024,158702],[50,57,2024,161948],[57,49,2025,161948],[47,746,2025,162076],[49,63,2021,162446],[50,44,2023,162489],[44,50,2025,162489],[45,66,2024,162714],[48,34,2022,171058],[34,48,2022,171058],[48,34,2023,171058],[33,44,2023,180560],[44,33,2024,180560],[33,44,2025,180560],[49,44,2025,181797],[50,44,2023,181827],[48,38,2021,193296],[41,45,2024,195993],[35,44,2025,196855],[35,40,2025,206254],[45,46,2024,215874],[33,64,2013,230960],[52,45,2024,270139],[49,41,2024,270508],[41,49,2024,270508],[49,44,2025,270508],[66,44,2023,278079],[44,66,2023,278079],[66,44,2025,278079],[50,41,2022,278085],[50,36,2025,278133],[36,50,2025,278133],[50,41,2022,282125],[41,49,2023,282125],[66,46,2024,283289],[33,49,2022,284324],[49,33,2023,284324],[33,49,2023,284324],[49,33,2024,284324],[33,49,2024,284324],[50,41,2024,284356],[46,50,2024,284372],[48,63,2022,284408],[48,50,2024,284409],[47,746,2025,284414],[42,49,2022,284428],[49,57,2024,284428],[57,65,2025,284428],[42,66,2023,284439],[49,34,2023,284492],[34,49,2023,284492],[49,34,2024,284492],[34,49,2024,284492],[49,34,2025,284492],[60,66,2021,284500],[66,45,2024,284500],[45,66,2024,284500],[66,45,2025,284500],[42,33,2024,284539],[35,55,2022,284797],[55,35,2023,284797],[35,55,2023,284797],[55,35,2024,284797],[35,55,2024,284797],[49,44,2023,291476],[44,49,2023,291476],[62,35,2023,296458],[35,62,2023,296458],[62,35,2024,296458],[63,746,2025,297187],[51,746,2025,301771],[41,45,2025,304317],[49,65,2023,305834],[65,49,2024,305834],[42,51,2024,309501],[51,46,2024,311334],[46,51,2024,311334],[51,49,2025,311334],[49,63,2025,311334],[62,34,2023,315237],[34,62,2023,315237],[62,34,2024,315237],[63,47,2024,328089],[45,49,2023,328093],[50,65,2024,328096],[66,49,2024,329347],[49,66,2024,329347],[49,46,2024,330986],[46,49,2024,330986],[49,45,2025,334037],[45,49,2025,334037],[44,47,2024,336564],[41,48,2025,336585],[40,35,2025,343576],[38,55,2023,349288],[41,55,2024,350625],[34,51,2024,383685],[49,746,2025,392270],[42,33,2024,402329],[33,42,2024,402329],[42,33,2025,402329]]};
+</script>
+<script>
+(function () {
+  "use strict";
+  const root = document.documentElement;
+  const tooltip = document.getElementById("tooltip");
+  const el = id => document.getElementById(id);
+  function showTooltip(evt, html) { tooltip.innerHTML = html; tooltip.classList.add("show"); moveTooltip(evt); }
+  function moveTooltip(evt) { tooltip.style.left = evt.clientX + "px"; tooltip.style.top = (evt.clientY - 10) + "px"; }
+  function hideTooltip() { tooltip.classList.remove("show"); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  function fmt(n) { return Number(n).toLocaleString(); }
+
+  const seasonLabel = s => s + "/" + String(s + 1).slice(-2);
+  const teamName = id => (RAW.teams[String(id)] || ["#" + id, "?"])[0];
+  const teamShort = id => (RAW.teams[String(id)] || ["#" + id, "?"])[1];
+  const playerName = id => RAW.players[String(id)] || ("#" + id);
+  const E = { from: 0, to: 1, season: 2, pid: 3 };
+
+  // ---- palette (re-read each render so light/dark + theme toggle stay correct) ----
+  function hexA(hex, a) {
+    hex = hex.trim();
+    if (hex[0] !== "#") return hex;
+    if (hex.length === 4) hex = "#" + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+  function palette() {
+    const cs = getComputedStyle(document.querySelector(".viz-root"));
+    const g = n => cs.getPropertyValue(n).trim();
+    return {
+      base: g("--series-1"), inc: g("--series-1"), out: g("--series-6"), trace: g("--series-4"),
+      node: g("--text-secondary"), nodeSel: g("--text-primary"), stroke: g("--surface-1"),
+      label: g("--text-muted"), labelStrong: g("--text-primary"), ring: g("--grid"),
+    };
+  }
+
+  // ---- geometry ----
+  const teamIds = Object.keys(RAW.teams).map(Number).sort((a, b) => teamName(a).localeCompare(teamName(b)));
+  const N = teamIds.length;
+  const idx = new Map(teamIds.map((id, i) => [id, i]));
+  const SEASONS = RAW.seasons.slice();
+  const MIN_S = SEASONS[0], MAX_S = SEASONS[SEASONS.length - 1];
+
+  const canvas = el("graph");
+  const ctx = canvas.getContext("2d");
+  let size = 600, cx = 300, cy = 300, R = 236, dpr = 1;
+  const nodePos = []; // {x,y,ang}
+
+  function layout() {
+    const cssW = canvas.parentElement.clientWidth - 20; // padding
+    size = Math.max(320, Math.min(cssW, 640));
+    dpr = window.devicePixelRatio || 1;
+    canvas.style.width = size + "px";
+    canvas.style.height = size + "px";
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx = size / 2; cy = size / 2;
+    R = size / 2 - Math.max(46, size * 0.11);
+    nodePos.length = 0;
+    for (let i = 0; i < N; i++) {
+      const ang = -Math.PI / 2 + (i / N) * Math.PI * 2;
+      nodePos[i] = { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang), ang };
+    }
+  }
+
+  // ---- state ----
+  let fromS = MIN_S, toS = MAX_S;
+  let selTeam = null;      // hovered or clicked team id
+  let lockedTeam = null;   // click-locked team id
+  let tracePid = null;     // player being traced
+  let viewEdges = [];      // edges in current season range
+  let nodeVol = [];        // per-node transfer count in view
+
+  function recomputeView() {
+    viewEdges = RAW.edges.filter(e => e[E.season] >= fromS && e[E.season] <= toS);
+    nodeVol = new Array(N).fill(0);
+    viewEdges.forEach(e => {
+      if (idx.has(e[E.from])) nodeVol[idx.get(e[E.from])]++;
+      if (idx.has(e[E.to])) nodeVol[idx.get(e[E.to])]++;
+    });
+  }
+
+  function recency(season) {
+    if (toS === fromS) return 1;
+    return (season - fromS) / (toS - fromS);
+  }
+
+  function tracePath(pid) {
+    // ordered team sequence for the player, restricted to edges (moves)
+    const es = RAW.edges.filter(e => e[E.pid] === pid).sort((a, b) => a[E.season] - b[E.season]);
+    return es;
+  }
+
+  // ---- draw ----
+  function draw() {
+    const P = palette();
+    ctx.clearRect(0, 0, size, size);
+    const focus = lockedTeam || selTeam;
+    const traceEdges = tracePid != null ? tracePath(tracePid) : null;
+    const traceSet = traceEdges ? new Set(traceEdges) : null;
+
+    // guide ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.strokeStyle = hexA(P.ring, 0.7);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const maxVol = Math.max(1, ...nodeVol);
+
+    // edges
+    for (const e of viewEdges) {
+      if (!idx.has(e[E.from]) || !idx.has(e[E.to])) continue;
+      const a = nodePos[idx.get(e[E.from])], b = nodePos[idx.get(e[E.to])];
+      const t = recency(e[E.season]);
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const cpx = mx + (cx - mx) * 0.55, cpy = my + (cy - my) * 0.55;
+
+      let color, width, alpha;
+      const inTrace = traceSet && traceSet.has(e);
+      if (traceSet) {
+        if (inTrace) { color = P.trace; width = 2.6; alpha = 0.95; }
+        else { color = P.base; width = 1; alpha = 0.015 + 0.03 * t; }
+      } else if (focus != null) {
+        if (e[E.to] === focus) { color = P.inc; width = 1.6; alpha = 0.28 + 0.6 * t; }
+        else if (e[E.from] === focus) { color = P.out; width = 1.6; alpha = 0.28 + 0.6 * t; }
+        else { color = P.base; width = 1; alpha = 0.015 + 0.03 * t; }
+      } else {
+        color = P.base; width = 1; alpha = 0.05 + 0.55 * Math.pow(t, 1.4);
+      }
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.quadraticCurveTo(cpx, cpy, b.x, b.y);
+      ctx.strokeStyle = hexA(color, Math.min(1, alpha));
+      ctx.lineWidth = width;
+      ctx.stroke();
+    }
+
+    // trace arrowheads (drawn on top)
+    if (traceEdges && traceEdges.length) {
+      for (const e of traceEdges) {
+        if (!idx.has(e[E.from]) || !idx.has(e[E.to])) continue;
+        const b = nodePos[idx.get(e[E.to])];
+        drawDot(b.x, b.y, 3.2, P.trace);
+      }
+    }
+
+    // nodes + labels
+    ctx.font = "600 10px system-ui, -apple-system, 'Segoe UI', sans-serif";
+    ctx.textBaseline = "middle";
+    for (let i = 0; i < N; i++) {
+      const p = nodePos[i], id = teamIds[i];
+      const r = 3.2 + 6.2 * Math.sqrt(nodeVol[i] / maxVol);
+      const related = focus != null && (id === focus);
+      const isTraceTeam = traceEdges && traceEdges.some(e => e[E.from] === id || e[E.to] === id);
+      let nodeColor = P.node, dim = 1;
+      if (focus != null && !related) dim = 0.5;
+      if (traceSet && !isTraceTeam) dim = 0.4;
+      if (related) nodeColor = P.nodeSel;
+      if (isTraceTeam) nodeColor = P.trace;
+      drawDot(p.x, p.y, r, hexA(nodeColor, dim), P.stroke);
+
+      // label just outside the node
+      const lx = cx + (R + 16) * Math.cos(p.ang), ly = cy + (R + 16) * Math.sin(p.ang);
+      const rightSide = Math.cos(p.ang) >= 0;
+      ctx.textAlign = rightSide ? "left" : "right";
+      const strong = related || isTraceTeam;
+      ctx.fillStyle = hexA(strong ? P.labelStrong : P.label, focus != null && !related && !isTraceTeam ? 0.55 : 1);
+      ctx.font = (strong ? "700 " : "600 ") + "10px system-ui, -apple-system, 'Segoe UI', sans-serif";
+      ctx.fillText(teamShort(id), lx, ly);
+    }
+  }
+
+  function drawDot(x, y, r, fill, stroke) {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.5; }
+    ctx.fill();
+    if (stroke) ctx.stroke();
+  }
+
+  // ---- hit testing ----
+  function nodeAt(mx, my) {
+    let best = -1, bestD = 16 * 16;
+    for (let i = 0; i < N; i++) {
+      const p = nodePos[i], dx = mx - p.x, dy = my - p.y, d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best >= 0 ? teamIds[best] : null;
+  }
+
+  // ---- info panel ----
+  function renderInfo() {
+    const focus = lockedTeam || selTeam;
+    if (tracePid != null) {
+      const es = tracePath(tracePid);
+      el("info-title").textContent = playerName(tracePid);
+      el("info-lead").textContent = es.length
+        ? `${es.length} move${es.length === 1 ? "" : "s"} in this dataset` + (es.length ? ` · path across ${new Set(es.flatMap(e => [e[E.from], e[E.to]])).size} clubs` : "")
+        : "No moves recorded for this player in the current data.";
+      el("info-body").innerHTML = es.length
+        ? `<div class="trace-list">` + es.map(e =>
+            `<div class="t"><span class="mv">${esc(teamShort(e[E.from]))} &rarr; <b>${esc(teamShort(e[E.to]))}</b></span><span class="yr">${seasonLabel(e[E.season])}</span></div>`
+          ).join("") + `</div>`
+        : "";
+      return;
+    }
+    if (focus == null) {
+      el("info-title").textContent = "All clubs";
+      el("info-lead").textContent = "Hover or tap a club to highlight its transfers. Click to keep it selected.";
+      const total = viewEdges.length;
+      el("info-body").innerHTML =
+        `<div class="metric-row"><div class="metric"><span class="m-val">${fmt(total)}</span><span class="m-lab">moves in view</span></div>` +
+        `<div class="metric"><span class="m-val">${SEASONS.filter(s => s >= fromS && s <= toS).length}</span><span class="m-lab">seasons</span></div>` +
+        `<div class="metric"><span class="m-val">${N}</span><span class="m-lab">clubs</span></div></div>`;
+      return;
+    }
+    // team focus
+    const incoming = viewEdges.filter(e => e[E.to] === focus);
+    const outgoing = viewEdges.filter(e => e[E.from] === focus);
+    el("info-title").textContent = teamName(focus);
+    el("info-lead").textContent = lockedTeam ? "Click the club again (or Clear) to deselect." : "Click to keep this club selected.";
+    const partners = new Map(); // otherId -> {in,out}
+    incoming.forEach(e => { const o = e[E.from]; if (!partners.has(o)) partners.set(o, { in: 0, out: 0 }); partners.get(o).in++; });
+    outgoing.forEach(e => { const o = e[E.to]; if (!partners.has(o)) partners.set(o, { in: 0, out: 0 }); partners.get(o).out++; });
+    const plist = [...partners.entries()].map(([o, v]) => ({ o, ...v, tot: v.in + v.out }))
+      .sort((a, b) => b.tot - a.tot).slice(0, 8);
+    el("info-body").innerHTML =
+      `<div class="metric-row">` +
+      `<div class="metric"><span class="m-val m-in">${incoming.length}</span><span class="m-lab">arrivals</span></div>` +
+      `<div class="metric"><span class="m-val m-out">${outgoing.length}</span><span class="m-lab">departures</span></div>` +
+      `</div>` +
+      (plist.length ? `<div class="partner-list">` + plist.map(p =>
+        `<div class="p"><span>${esc(teamName(p.o))}</span><span class="dir">${p.in ? `<span class="m-in">&larr;${p.in}</span>` : ""}${p.in && p.out ? " " : ""}${p.out ? `<span class="m-out">${p.out}&rarr;</span>` : ""}</span></div>`
+      ).join("") + `</div>` : "");
+  }
+
+  // ---- table ----
+  let txFilter = "";
+  function renderTable() {
+    const tableEl = el("tx-table");
+    let rows = viewEdges.map(e => ({
+      from: teamName(e[E.from]), to: teamName(e[E.to]), season: e[E.season], player: playerName(e[E.pid]),
+    }));
+    const focus = lockedTeam || selTeam;
+    if (tracePid != null) rows = rows.filter(r => r.player === playerName(tracePid));
+    else if (focus != null) rows = rows.filter(r => r.from === teamName(focus) || r.to === teamName(focus));
+    if (txFilter) { const q = txFilter.toLowerCase(); rows = rows.filter(r => r.from.toLowerCase().includes(q) || r.to.toLowerCase().includes(q) || r.player.toLowerCase().includes(q)); }
+
+    let sortKey = "season", sortDir = "desc";
+    const cols = [
+      { key: "player", label: "Player" },
+      { key: "from", label: "From" },
+      { key: "to", label: "To" },
+      { key: "season", label: "Season", num: true, fmt: v => seasonLabel(v) },
+    ];
+    function drawT() {
+      const sorted = [...rows].sort((a, b) => { const av = a[sortKey], bv = b[sortKey]; let c = typeof av === "string" ? av.localeCompare(bv) : av - bv; return sortDir === "asc" ? c : -c; });
+      tableEl.innerHTML = `<thead><tr>${cols.map(c => `<th data-key="${c.key}" class="${c.num ? "num" : ""} ${sortKey === c.key ? (sortDir === "asc" ? "sort-asc" : "sort-desc") : ""}">${esc(c.label)}</th>`).join("")}</tr></thead>` +
+        `<tbody>${sorted.slice(0, 400).map(r => `<tr>${cols.map(c => `<td class="${c.num ? "num" : ""}">${c.fmt ? c.fmt(r[c.key]) : esc(r[c.key])}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      tableEl.querySelectorAll("th").forEach(th => th.addEventListener("click", () => { const k = th.getAttribute("data-key"); if (sortKey === k) sortDir = sortDir === "asc" ? "desc" : "asc"; else { sortKey = k; sortDir = k === "season" ? "desc" : "asc"; } drawT(); }));
+    }
+    drawT();
+  }
+
+  function renderAll() {
+    draw(); renderInfo(); renderTable();
+    el("hero-sub").textContent = `${RAW.league} · ${fmt(RAW.edges.length)} moves across ${N} clubs, ${seasonLabel(MIN_S)}–${seasonLabel(MAX_S)}`;
+  }
+
+  // ---- legend gradient ----
+  function paintLegend() {
+    const P = palette();
+    el("leg-bar").style.background = `linear-gradient(to right, ${hexA(P.base, 0.08)}, ${hexA(P.base, 0.9)})`;
+    el("leg-old").textContent = seasonLabel(fromS);
+    el("leg-new").textContent = seasonLabel(toS);
+  }
+
+  // ---- controls ----
+  const fromSel = el("c-from"), toSel = el("c-to");
+  const opts = SEASONS.map(s => `<option value="${s}">${seasonLabel(s)}</option>`).join("");
+  fromSel.innerHTML = opts; toSel.innerHTML = opts;
+  fromSel.value = String(fromS); toSel.value = String(toS);
+
+  const playerOpts = Object.keys(RAW.players).map(id => RAW.players[id]).sort((a, b) => a.localeCompare(b));
+  el("player-list").innerHTML = [...new Set(playerOpts)].map(n => `<option value="${esc(n)}"></option>`).join("");
+  const nameToPid = new Map();
+  Object.keys(RAW.players).forEach(id => { const n = RAW.players[id]; if (!nameToPid.has(n)) nameToPid.set(n, +id); });
+
+  function applyRange() {
+    if (fromS > toS) { const t = fromS; fromS = toS; toS = t; fromSel.value = String(fromS); toSel.value = String(toS); }
+    recomputeView(); paintLegend(); renderAll();
+  }
+  fromSel.addEventListener("change", () => { fromS = +fromSel.value; applyRange(); });
+  toSel.addEventListener("change", () => { toS = +toSel.value; applyRange(); });
+
+  el("c-player").addEventListener("input", e => {
+    const n = e.target.value.trim();
+    tracePid = nameToPid.has(n) ? nameToPid.get(n) : null;
+    if (tracePid != null) { lockedTeam = null; selTeam = null; }
+    renderAll();
+  });
+  el("c-clear").addEventListener("click", () => {
+    lockedTeam = null; selTeam = null; tracePid = null; el("c-player").value = ""; renderAll();
+  });
+  el("t-filter").addEventListener("input", e => { txFilter = e.target.value; renderTable(); });
+
+  // ---- canvas interaction ----
+  function canvasXY(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const cxp = (evt.touches ? evt.touches[0].clientX : evt.clientX) - rect.left;
+    const cyp = (evt.touches ? evt.touches[0].clientY : evt.clientY) - rect.top;
+    return [cxp * (size / rect.width), cyp * (size / rect.height)];
+  }
+  canvas.addEventListener("mousemove", evt => {
+    if (tracePid != null) return;
+    const [mx, my] = canvasXY(evt);
+    const id = nodeAt(mx, my);
+    canvas.style.cursor = id != null ? "pointer" : "default";
+    if (id !== selTeam) { selTeam = id; draw(); if (!lockedTeam) renderInfo(); }
+    if (id != null) {
+      const inc = viewEdges.filter(e => e[E.to] === id).length, out = viewEdges.filter(e => e[E.from] === id).length;
+      showTooltip(evt, `<b>${esc(teamName(id))}</b><br>${inc} in · ${out} out`);
+    } else if (!lockedTeam) hideTooltip();
+  });
+  canvas.addEventListener("mouseleave", () => { if (tracePid == null && !lockedTeam) { selTeam = null; draw(); renderInfo(); } hideTooltip(); });
+  canvas.addEventListener("click", evt => {
+    const [mx, my] = canvasXY(evt);
+    const id = nodeAt(mx, my);
+    if (id == null) { lockedTeam = null; }
+    else lockedTeam = (lockedTeam === id) ? null : id;
+    selTeam = id; tracePid = null; el("c-player").value = "";
+    renderAll();
+  });
+  // touch: tap selects
+  canvas.addEventListener("touchstart", evt => {
+    const [mx, my] = canvasXY(evt);
+    const id = nodeAt(mx, my);
+    if (id != null) { evt.preventDefault(); lockedTeam = (lockedTeam === id) ? null : id; selTeam = id; tracePid = null; el("c-player").value = ""; renderAll(); }
+  }, { passive: false });
+
+  document.addEventListener("mousemove", e => { if (tooltip.classList.contains("show")) moveTooltip(e); });
+
+  // ---- resize ----
+  let rz;
+  const ro = new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { layout(); draw(); }, 60); });
+  ro.observe(canvas.parentElement);
+  // redraw on theme toggle (data-theme attr) so canvas colors follow
+  new MutationObserver(() => { paintLegend(); draw(); }).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+  if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { paintLegend(); draw(); });
+
+  el("footer").textContent = `Generated ${new Date(RAW.generated_at).toLocaleString()} from acca-bot's local Premier League dataset. Transfers are inferred from season-by-season club changes; there are no fees or dates in this data.`;
+
+  layout();
+  recomputeView();
+  paintLegend();
+  renderAll();
+})();
+</script>
+</body>
+</html>

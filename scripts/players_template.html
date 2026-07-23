@@ -318,6 +318,8 @@
     <a href="#leaderboards">Leaderboards</a>
     <a href="#impact">Impact index</a>
     <a href="#profile">Player profile</a>
+    <a href="pl_squads.html" style="font-weight:750;color:var(--series-1)">Squads &rarr;</a>
+    <a href="pl_transfers.html" style="font-weight:750;color:var(--series-1)">Transfers &rarr;</a>
   </nav>
 
   <div class="wrap">
@@ -592,6 +594,18 @@ const RAW = __PLAYERS_RAW__;
   el("p-select").addEventListener("change", e => renderProfile(e.target.value));
   document.addEventListener("mousemove", e => { if (tooltip.classList.contains("show")) moveTooltip(e); });
   refresh();
+
+  // Deep link: pl_players.html?player=<id> (used by the Squads page) opens straight
+  // to that player's profile in the default all-seasons view.
+  const deepPid = new URLSearchParams(location.search).get("player");
+  if (deepPid) {
+    const sel = el("p-select");
+    if ([...sel.options].some(o => o.value === deepPid)) {
+      sel.value = deepPid;
+      renderProfile(deepPid);
+      document.getElementById("profile").scrollIntoView({ block: "start" });
+    }
+  }
 })();
 </script>
 

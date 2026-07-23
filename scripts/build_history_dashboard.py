@@ -22,8 +22,42 @@ TEAM_TEMPLATE_PATH = ROOT / "scripts" / "team_explorer_template.html"
 TEAM_OUTPUT_PATH = ROOT / "reports" / "pl_team_explorer.html"
 PLAYERS_TEMPLATE_PATH = ROOT / "scripts" / "players_template.html"
 PLAYERS_OUTPUT_PATH = ROOT / "reports" / "pl_players.html"
+SQUADS_TEMPLATE_PATH = ROOT / "scripts" / "squads_template.html"
+SQUADS_OUTPUT_PATH = ROOT / "reports" / "pl_squads.html"
+TRANSFERS_TEMPLATE_PATH = ROOT / "scripts" / "transfers_template.html"
+TRANSFERS_OUTPUT_PATH = ROOT / "reports" / "pl_transfers.html"
+
+SITE_DIR = ROOT / "site"
+
+# Report filename -> clean URL path for the hosted copy ("" is the site root).
+# Each becomes site/<path>/index.html so a plain static host serves /squads etc.
+SITE_ROUTES = {
+    "pl_history_dashboard.html": "",
+    "pl_team_explorer.html": "teams",
+    "pl_players.html": "players",
+    "pl_squads.html": "squads",
+    "pl_transfers.html": "transfers",
+}
 
 LEAGUE_ID = 39  # Premier League in the api-football id space this DB uses
+
+# Three-letter codes for the radial transfer graph / squad chips. Falls back to an
+# algorithmic abbreviation for any team id not listed here.
+TEAM_SHORT = {
+    33: "MUN", 34: "NEW", 35: "BOU", 36: "FUL", 37: "HUD", 38: "WAT", 39: "WOL",
+    40: "LIV", 41: "SOU", 42: "ARS", 43: "CAR", 44: "BUR", 45: "EVE", 46: "LEI",
+    47: "TOT", 48: "WHU", 49: "CHE", 50: "MCI", 51: "BHA", 52: "CRY", 53: "REA",
+    54: "BIR", 55: "BRE", 57: "IPS", 60: "WBA", 61: "WIG", 62: "SHU", 63: "LEE",
+    64: "HUL", 65: "NFO", 66: "AVL", 67: "BLB", 68: "BOL", 70: "MID", 71: "NOR",
+    72: "QPR", 75: "STK", 76: "SWA", 746: "SUN", 1356: "BLP", 1359: "LUT",
+}
+
+
+def _team_short(tid: int, name: str) -> str:
+    if tid in TEAM_SHORT:
+        return TEAM_SHORT[tid]
+    letters = [c for c in name.upper() if c.isalpha()]
+    return "".join(letters[:3]) if letters else str(tid)
 
 
 def main() -> None:
@@ -58,6 +92,69 @@ def main() -> None:
     players_html = players_template.replace("__PLAYERS_RAW__", json.dumps(players_raw, separators=(",", ":")))
     PLAYERS_OUTPUT_PATH.write_text(players_html, encoding="utf-8")
     print(f"Wrote {PLAYERS_OUTPUT_PATH} ({len(players_html):,} bytes) from {DB_PATH}")
+
+    # Squads and Transfers reuse the canonical <style> block from the home template
+    # verbatim (injected via __SHARED_STYLE__) so the design system stays identical.
+    shared_style = _shared_style()
+
+    con4 = sqlite3.connect(DB_PATH)
+    con4.row_factory = sqlite3.Row
+    squads_raw = build_squads(con4)
+    con4.close()
+    squads_template = SQUADS_TEMPLATE_PATH.read_text(encoding="utf-8")
+    squads_html = (
+        squads_template
+        .replace("__SHARED_STYLE__", shared_style)
+        .replace("__SQUADS_RAW__", json.dumps(squads_raw, separators=(",", ":")))
+    )
+    SQUADS_OUTPUT_PATH.write_text(squads_html, encoding="utf-8")
+    print(f"Wrote {SQUADS_OUTPUT_PATH} ({len(squads_html):,} bytes) from {DB_PATH}")
+
+    con5 = sqlite3.connect(DB_PATH)
+    con5.row_factory = sqlite3.Row
+    transfers_raw = build_transfers(con5)
+    con5.close()
+    transfers_template = TRANSFERS_TEMPLATE_PATH.read_text(encoding="utf-8")
+    transfers_html = (
+        transfers_template
+        .replace("__SHARED_STYLE__", shared_style)
+        .replace("__TRANSFERS_RAW__", json.dumps(transfers_raw, separators=(",", ":")))
+    )
+    TRANSFERS_OUTPUT_PATH.write_text(transfers_html, encoding="utf-8")
+    print(f"Wrote {TRANSFERS_OUTPUT_PATH} ({len(transfers_html):,} bytes) from {DB_PATH}")
+
+    build_site()
+
+
+def build_site() -> None:
+    """Mirror reports/ into site/ as clean-URL pages for hosting on a real domain.
+
+    reports/*.html stay as-is (self-contained, links work from a single folder --
+    good for emailing). The site/ copy instead uses root-relative links (/players)
+    and a directory per page, so a static host serves /squads with no .html suffix
+    and navigation stays in the same tab.
+    """
+    for fname, route in SITE_ROUTES.items():
+        html = (ROOT / "reports" / fname).read_text(encoding="utf-8")
+        for other, other_route in SITE_ROUTES.items():
+            html = html.replace(other, f"/{other_route}" if other_route else "/")
+        dest_dir = SITE_DIR / route if route else SITE_DIR
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        (dest_dir / "index.html").write_text(html, encoding="utf-8")
+    print(f"Wrote {len(SITE_ROUTES)} clean-URL pages to {SITE_DIR}")
+
+
+def _shared_style() -> str:
+    """Return the inner contents of the canonical <style> block from the home
+    template, so Squads/Transfers pages share exactly the same design tokens and
+    chart CSS instead of hand-copying them."""
+    import re
+
+    home = TEMPLATE_PATH.read_text(encoding="utf-8")
+    m = re.search(r"<style>(.*?)</style>", home, re.S)
+    if not m:
+        raise RuntimeError("Could not find <style> block in dashboard_template.html")
+    return m.group(1)
 
 
 def build_data(con: sqlite3.Connection) -> dict:
@@ -989,6 +1086,169 @@ def _latest_highlights(table: list[dict], season_lbl: str) -> list[dict]:
         if faller["points_delta"] < 0:
             highlights.append({"label": "Biggest drop", "team": faller["team"], "detail": f"{faller['points_delta']} pts vs previous season"})
     return highlights
+
+
+def build_squads(con: sqlite3.Connection) -> dict:
+    """Per team-season squad rows so the Squads page can arrange a most-used XI and
+    a full squad table in the browser. There is no per-fixture lineup table in this
+    DB, so a 'lineup' here is derived from season stats (starts = the `lineups`
+    column), not an actual match-day XI -- the page states this explicitly.
+
+    Rows are compact arrays; field order is documented in the page JS.
+    """
+    teams = {row["id"]: row["name"] for row in con.execute("SELECT id, name FROM teams")}
+    players = {
+        row["id"]: row
+        for row in con.execute("SELECT id, name, nationality FROM players")
+    }
+    pos_code = {"Attacker": "F", "Midfielder": "M", "Defender": "D", "Goalkeeper": "G"}
+
+    rows = con.execute(
+        """
+        SELECT player_id, team_id, season, position, appearances, lineups, minutes,
+               rating, goals, assists
+        FROM player_season_stats
+        WHERE league_id = ?
+        """,
+        (LEAGUE_ID,),
+    ).fetchall()
+
+    used_players: set[int] = set()
+    used_teams: set[int] = set()
+    squad = []
+    for r in rows:
+        used_players.add(r["player_id"])
+        used_teams.add(r["team_id"])
+        squad.append([
+            r["player_id"], r["team_id"], r["season"],
+            pos_code.get(r["position"], "?"),
+            r["appearances"] or 0, r["lineups"] or 0, r["minutes"] or 0,
+            round(r["rating"], 2) if r["rating"] is not None else None,
+            r["goals"] or 0, r["assists"] or 0,
+        ])
+
+    seasons = sorted({r["season"] for r in rows})
+
+    # Default the page to the latest season's champion for a strong first render.
+    default_team = _latest_champion(con, seasons[-1]) if seasons else None
+
+    return {
+        "generated_at": _now_iso(),
+        "league": "Premier League",
+        "seasons": seasons,
+        "default_season": seasons[-1] if seasons else None,
+        "default_team": default_team,
+        "teams": {
+            str(k): [teams[k], _team_short(k, teams[k])]
+            for k in used_teams if k in teams
+        },
+        # id -> [name, nationality]
+        "players": {
+            str(pid): [players[pid]["name"], players[pid]["nationality"]]
+            for pid in used_players if pid in players
+        },
+        # [player_id, team_id, season, pos, apps, starts, minutes, rating, goals, assists]
+        "squad": squad,
+    }
+
+
+def _latest_champion(con: sqlite3.Connection, season: int) -> int | None:
+    """Points-ranked table winner for one season, computed from fixtures (the
+    standings_snapshots table has a known off-by-one bug)."""
+    pts: dict[int, list[int]] = defaultdict(lambda: [0, 0])  # tid -> [points, gd]
+    for f in con.execute(
+        """SELECT home_team_id, away_team_id, home_goals, away_goals
+           FROM fixtures WHERE league_id = ? AND season = ?""",
+        (LEAGUE_ID, season),
+    ):
+        h, a, hg, ag = f["home_team_id"], f["away_team_id"], f["home_goals"], f["away_goals"]
+        if hg is None or ag is None:
+            continue
+        pts[h][1] += hg - ag
+        pts[a][1] += ag - hg
+        if hg > ag:
+            pts[h][0] += 3
+        elif ag > hg:
+            pts[a][0] += 3
+        else:
+            pts[h][0] += 1
+            pts[a][0] += 1
+    if not pts:
+        return None
+    return max(pts.items(), key=lambda kv: (kv[1][0], kv[1][1]))[0]
+
+
+def build_transfers(con: sqlite3.Connection) -> dict:
+    """Transfer edges inferred from season-over-season club changes in
+    player_season_stats. There is no transfer table in this DB, so every move is
+    reconstructed by ordering each player's rows by season and detecting a change
+    of team_id. Granularity is season only -- no fees, no exact dates. A player
+    with two clubs inside one season (a mid-season move/loan) yields an edge too.
+
+    A transfer edge = [from_team_id, to_team_id, season_of_arrival, player_id].
+    """
+    teams = {row["id"]: row["name"] for row in con.execute("SELECT id, name FROM teams")}
+    players = {
+        row["id"]: row["name"]
+        for row in con.execute("SELECT id, name FROM players")
+    }
+
+    # Preserve DB order within a season (rowid) so mid-season two-club rows keep a
+    # stable, reproducible sequence -- this matches the 1683-edge count measured
+    # for this dataset.
+    rows = con.execute(
+        """
+        SELECT player_id, season, team_id
+        FROM player_season_stats
+        WHERE league_id = ?
+        ORDER BY player_id, season, rowid
+        """,
+        (LEAGUE_ID,),
+    ).fetchall()
+
+    by_player: dict[int, list[tuple[int, int]]] = defaultdict(list)
+    for r in rows:
+        by_player[r["player_id"]].append((r["season"], r["team_id"]))
+
+    edges = []
+    used_teams: set[int] = set()
+    used_players: set[int] = set()
+    for pid, seq in by_player.items():
+        prev_team = None
+        prev_season = None
+        for season, tid in seq:
+            if prev_team is not None and tid != prev_team:
+                # Arrival season is the later of the two rows involved.
+                edges.append([prev_team, tid, max(season, prev_season), pid])
+                used_teams.add(prev_team)
+                used_teams.add(tid)
+                used_players.add(pid)
+            prev_team = tid
+            prev_season = season
+
+    seasons = sorted({e[2] for e in edges})
+    # All 41 PL teams belong on the ring, even any with no detected moves.
+    all_pl_teams = sorted(
+        {r["team_id"] for r in con.execute(
+            "SELECT DISTINCT team_id FROM player_season_stats WHERE league_id = ?",
+            (LEAGUE_ID,))}
+    )
+    used_teams.update(all_pl_teams)
+
+    return {
+        "generated_at": _now_iso(),
+        "league": "Premier League",
+        "seasons": seasons,
+        # id -> [name, short]
+        "teams": {
+            str(k): [teams[k], _team_short(k, teams[k])]
+            for k in sorted(used_teams) if k in teams
+        },
+        # id -> name (only players who moved)
+        "players": {str(pid): players[pid] for pid in used_players if pid in players},
+        # [from_team_id, to_team_id, arrival_season, player_id]
+        "edges": edges,
+    }
 
 
 if __name__ == "__main__":

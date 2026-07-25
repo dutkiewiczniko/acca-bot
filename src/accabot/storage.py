@@ -154,6 +154,27 @@ CREATE TABLE IF NOT EXISTS team_season_stats (
     PRIMARY KEY (league_id, season, team_id)
 );
 
+CREATE TABLE IF NOT EXISTS historical_odds (
+    fixture_id INTEGER PRIMARY KEY REFERENCES fixtures(id),
+    source TEXT NOT NULL,
+    -- 1X2 pre-match odds
+    pinnacle_home REAL,
+    pinnacle_draw REAL,
+    pinnacle_away REAL,
+    avg_home REAL,
+    avg_draw REAL,
+    avg_away REAL,
+    -- 1X2 closing odds (where the source records them separately; 2019/20+)
+    pinnacle_close_home REAL,
+    pinnacle_close_draw REAL,
+    pinnacle_close_away REAL,
+    -- Over/Under 2.5 total-goals odds
+    pinnacle_over25 REAL,
+    pinnacle_under25 REAL,
+    avg_over25 REAL,
+    avg_under25 REAL
+);
+
 CREATE TABLE IF NOT EXISTS fixture_importance (
     fixture_id INTEGER PRIMARY KEY REFERENCES fixtures(id),
     importance REAL NOT NULL,
@@ -190,6 +211,60 @@ def upsert_team(conn: sqlite3.Connection, *, team_id: int, name: str, country: s
         ON CONFLICT(id) DO UPDATE SET name = excluded.name, country = excluded.country
         """,
         (team_id, name, country),
+    )
+
+
+def upsert_historical_odds(
+    conn: sqlite3.Connection,
+    *,
+    fixture_id: int,
+    source: str,
+    pinnacle_home: float | None = None,
+    pinnacle_draw: float | None = None,
+    pinnacle_away: float | None = None,
+    avg_home: float | None = None,
+    avg_draw: float | None = None,
+    avg_away: float | None = None,
+    pinnacle_close_home: float | None = None,
+    pinnacle_close_draw: float | None = None,
+    pinnacle_close_away: float | None = None,
+    pinnacle_over25: float | None = None,
+    pinnacle_under25: float | None = None,
+    avg_over25: float | None = None,
+    avg_under25: float | None = None,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO historical_odds (
+            fixture_id, source,
+            pinnacle_home, pinnacle_draw, pinnacle_away,
+            avg_home, avg_draw, avg_away,
+            pinnacle_close_home, pinnacle_close_draw, pinnacle_close_away,
+            pinnacle_over25, pinnacle_under25, avg_over25, avg_under25
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(fixture_id) DO UPDATE SET
+            source = excluded.source,
+            pinnacle_home = excluded.pinnacle_home,
+            pinnacle_draw = excluded.pinnacle_draw,
+            pinnacle_away = excluded.pinnacle_away,
+            avg_home = excluded.avg_home,
+            avg_draw = excluded.avg_draw,
+            avg_away = excluded.avg_away,
+            pinnacle_close_home = excluded.pinnacle_close_home,
+            pinnacle_close_draw = excluded.pinnacle_close_draw,
+            pinnacle_close_away = excluded.pinnacle_close_away,
+            pinnacle_over25 = excluded.pinnacle_over25,
+            pinnacle_under25 = excluded.pinnacle_under25,
+            avg_over25 = excluded.avg_over25,
+            avg_under25 = excluded.avg_under25
+        """,
+        (
+            fixture_id, source,
+            pinnacle_home, pinnacle_draw, pinnacle_away,
+            avg_home, avg_draw, avg_away,
+            pinnacle_close_home, pinnacle_close_draw, pinnacle_close_away,
+            pinnacle_over25, pinnacle_under25, avg_over25, avg_under25,
+        ),
     )
 
 

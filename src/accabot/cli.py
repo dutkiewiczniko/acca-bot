@@ -11,6 +11,7 @@ from .backfill import PREMIER_LEAGUE_ID, backfill_player_and_team_stats, backfil
 from .config import load_settings
 from .dashboard import run_dashboard
 from .football_data import FootballDataClient
+from .historical_odds import backfill_all_seasons
 from .odds_api import OddsApiClient
 from .ratelimit import RateLimiter
 from .scoring import build_accumulator, extract_selections
@@ -74,6 +75,15 @@ def main() -> None:
         default=int(os.getenv("API_FOOTBALL_PER_DAY", "100")),
         help="API-Football requests-per-day cap (free plan: 100, Pro: 7500).",
     )
+
+    backfill_odds = subparsers.add_parser(
+        "backfill-odds",
+        help="Backfill historical bookmaker odds from football-data.co.uk into local SQLite storage.",
+    )
+    backfill_odds.add_argument("--league", type=int, default=PREMIER_LEAGUE_ID, help="API-Football league id (default: Premier League, 39).")
+    backfill_odds.add_argument("--start-season", type=int, default=2010, help="First season start year to fetch (inclusive).")
+    backfill_odds.add_argument("--end-season", type=int, default=2025, help="Last season start year to fetch (inclusive).")
+    backfill_odds.add_argument("--db", default="data/acca-bot.sqlite3", help="Path to the local SQLite database file.")
 
     args = parser.parse_args()
     settings = load_settings()
@@ -171,6 +181,25 @@ def main() -> None:
 
     if args.command == "dashboard":
         run_dashboard(host=args.host, port=args.port)
+        return
+
+    if args.command == "backfill-odds":
+        conn = connect_db(Path(args.db))
+        reports = backfill_all_seasons(
+            conn,
+            league_id=args.league,
+            start_season=args.start_season,
+            end_season=args.end_season,
+        )
+        total_stored = 0
+        for report in reports:
+            if report.error:
+                print(f"{report.season}: ERROR {report.error}")
+                continue
+            total_stored += report.stored
+            note = f" | {len(report.unmatched_pairs)} unmatched" if report.unmatched_pairs else ""
+            print(f"{report.season}: stored {report.stored}/{report.rows_in_csv} rows{note}")
+        print(f"Total odds rows stored: {total_stored}")
         return
 
     if args.command == "backfill":

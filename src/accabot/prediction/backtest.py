@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from .data import Match, load_matches
+from .market import load_market_probs
 from .poisson import DixonColesModel
 
 _EPS = 1e-12
@@ -20,6 +21,7 @@ class MarketRecord:
 
     probs: dict[str, float]  # outcome label -> predicted probability
     outcome: str  # realized outcome label
+    fixture_id: int | None = None
 
 
 @dataclass
@@ -82,14 +84,12 @@ def run_walk_forward(
     matches (never shuffled), predict that matchday, then fold it into the
     training set before moving to the next one.
 
-    Two baselines are evaluated alongside the Dixon-Coles model:
+    Baselines evaluated alongside the Dixon-Coles model:
       - home_advantage_baseline: constant walk-forward H/D/A base rates.
-      - market_placeholder: NOT computed here. The existing conservative_model_
-        probability() placeholder is a function of bookmaker odds, and this
-        repository does not store historical closing odds (only live odds via
-        odds_api.py) - see storage.py. Comparing against it, or against the
-        real de-margined market, would require fabricating historical odds, so
-        it is skipped and flagged rather than faked.
+      - market: de-margined bookmaker probabilities from historical_odds (see
+        historical_odds.py / market.py). This is the real bar to beat. It is
+        scored only where odds exist; the dixon_coles_vs_market report scores
+        the model on that identical fixture subset so the comparison is fair.
     """
     all_matches = load_matches(conn, league_id=league_id, seasons=(start_season, end_season))
     if not all_matches:
@@ -135,9 +135,9 @@ def run_walk_forward(
             outcome = _one_x_two_outcome(match)
             pred = model.predict(match.home_id, match.away_id)
             model_records.append(
-                MarketRecord({"home": pred["home"], "draw": pred["draw"], "away": pred["away"]}, outcome)
+                MarketRecord({"home": pred["home"], "draw": pred["draw"], "away": pred["away"]}, outcome, match.fixture_id)
             )
-            baseline_records.append(MarketRecord(dict(baseline_probs), outcome))
+            baseline_records.append(MarketRecord(dict(baseline_probs), outcome, match.fixture_id))
 
             home_wins += outcome == "home"
             draws += outcome == "draw"
@@ -145,8 +145,26 @@ def run_walk_forward(
 
         training = training + group
 
+    market_probs = load_market_probs(conn, league_id=league_id)
+    market_records: list[MarketRecord] = []
+    model_on_market_subset: list[MarketRecord] = []
+    for record in model_records:
+        probs = market_probs.get(record.fixture_id)
+        if probs is None:
+            continue
+        market_records.append(MarketRecord(dict(probs), record.outcome, record.fixture_id))
+        model_on_market_subset.append(record)
+
     reports: dict[str, BacktestReport] = {}
-    for name, records in (("dixon_coles", model_records), ("home_advantage_baseline", baseline_records)):
+    scored = (
+        ("dixon_coles", model_records),
+        ("home_advantage_baseline", baseline_records),
+        ("market", market_records),
+        ("dixon_coles_vs_market", model_on_market_subset),
+    )
+    for name, records in scored:
+        if not records:
+            continue
         log_loss, brier = _score(records)
         reports[name] = BacktestReport(
             model_name=name,
@@ -168,13 +186,18 @@ def print_report(reports: dict[str, BacktestReport]) -> None:
         for pred, actual, n in report.calibration:
             print(f"  {pred:.2f} -> {actual:.2f}  (n={n})")
 
-    print(
-        "\nNOTE: market-implied comparison (the conservative_model_probability "
-        "placeholder, and the real de-margined bookmaker line) is not included "
-        "above. Historical closing odds are not stored in this database "
-        "(odds_api.py only fetches live odds - see storage.py), so that "
-        "comparison is blocked on gathering historical odds, not computed here."
-    )
+    if "dixon_coles_vs_market" in reports and "market" in reports:
+        model_ll = reports["dixon_coles_vs_market"].log_loss
+        market_ll = reports["market"].log_loss
+        gap = model_ll - market_ll
+        verdict = "model beats market" if gap < 0 else "market beats model"
+        print(
+            f"\nMODEL vs MARKET (same {reports['market'].n_predictions} fixtures): "
+            f"model log-loss {model_ll:.4f} vs market {market_ll:.4f} "
+            f"(gap {gap:+.4f}, {verdict}). Market probabilities are de-margined "
+            "via the proportional method from football-data.co.uk odds "
+            "(Pinnacle where available, else market average)."
+        )
 
 
 def main() -> None:

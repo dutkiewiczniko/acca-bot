@@ -22,6 +22,7 @@ _ALIASES: dict[str, str] = {
     "brighton & hove albion": "brighton",
     "leicester city": "leicester",
     "hull city": "hull city",
+    "hull": "hull city",
     "sheffield united": "sheffield utd",
     "west bromwich albion": "west brom",
     "nottm forest": "nottingham forest",
